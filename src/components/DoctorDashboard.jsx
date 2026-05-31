@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 
 const APPOINTMENTS = [
@@ -23,14 +24,16 @@ const SLOTS = [
 const SYMPTOMS = ['Anxiety – 3 wks', 'Insomnia', 'Racing heartbeat', 'Poor focus']
 
 export default function DoctorDashboard() {
+  const [activeSection, setActiveSection] = useState('dashboard')
+
   return (
     <div className="two-col-layout">
       <Sidebar
         navItems={[
-          { icon: 'ti-layout-dashboard', label: 'Dashboard',   active: true },
-          { icon: 'ti-clock',            label: 'Availability' },
-          { icon: 'ti-calendar',         label: 'Appointments' },
-          { icon: 'ti-notes-medical',    label: 'Patient notes'},
+          { icon: 'ti-layout-dashboard', label: 'Dashboard',   active: activeSection === 'dashboard', onClick: () => setActiveSection('dashboard') },
+          { icon: 'ti-clock',            label: 'Availability', active: activeSection === 'availability', onClick: () => setActiveSection('availability') },
+          { icon: 'ti-calendar',         label: 'Appointments', active: activeSection === 'appointments', onClick: () => setActiveSection('appointments') },
+          { icon: 'ti-notes-medical',    label: 'Patient notes', active: activeSection === 'notes', onClick: () => setActiveSection('notes') },
         ]}
         user={{ initials: 'AK', name: 'Dr. Ayşe Kaya', role: 'Psychologist' }}
       />

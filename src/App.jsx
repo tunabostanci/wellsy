@@ -17,6 +17,7 @@ const TABS = [
 
 export default function App() {
   const [active, setActive] = useState('chatbot')
+  const [staffDefaultView, setStaffDefaultView] = useState('dashboard')
 
   return (
     <div className="app-shell">
@@ -27,7 +28,10 @@ export default function App() {
             role="tab"
             aria-selected={active === t.id}
             className={`tab-btn${active === t.id ? ' active' : ''}`}
-            onClick={() => setActive(t.id)}
+            onClick={() => {
+              setActive(t.id)
+              if (t.id === 'staff') setStaffDefaultView('dashboard')
+            }}
           >
             <i className={`ti ${t.icon}`} aria-hidden="true" />
             {t.label}
@@ -36,12 +40,24 @@ export default function App() {
       </nav>
 
       <div className="screen-content">
-        {active === 'chatbot'    && <PatientChatbot      onNavigateToDoctors={() => setActive('doctors')} />}
-        {active === 'doctors'   && <DoctorListing        />}
-        {active === 'appts'     && <AppointmentTracking  />}
-        {active === 'dashboard' && <DoctorDashboard      />}
-        {active === 'staff'     && <StaffPanel           />}
-        {active === 'admin'     && <AdminPanel           />}
+        {active === 'chatbot' && (
+          <PatientChatbot onNavigateToDoctors={() => setActive('doctors')} />
+        )}
+        {active === 'doctors' && (
+          <DoctorListing
+            onBack={() => setActive('chatbot')}
+            onContinue={() => setActive('appts')}
+          />
+        )}
+        {active === 'appts' && (
+          <AppointmentTracking onNewAppointment={() => {
+            setStaffDefaultView('booking')
+            setActive('staff')
+          }} />
+        )}
+        {active === 'dashboard' && <DoctorDashboard />}
+        {active === 'staff' && <StaffPanel defaultView={staffDefaultView} />}
+        {active === 'admin' && <AdminPanel />}
       </div>
     </div>
   )

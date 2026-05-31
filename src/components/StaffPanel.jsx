@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 
 /* ── Mock data ───────────────────────────────────────────────────── */
@@ -39,7 +39,12 @@ const PATIENTS = [
   { name: 'Murat Demir',    tc: '45678901234', email: 'murat@email.com',  phone: '0535 444 55 66' },
 ]
 
-const DOCTORS = ['Dr. Ayşe Kaya', 'Dr. Mehmet Yılmaz', 'Dr. Zeynep Demir', 'Dr. Selin Aydın']
+const DOCTORS = [
+  { name: 'Dr. Ayşe Kaya', branch: 'Clinical Psychology' },
+  { name: 'Dr. Mehmet Yılmaz', branch: 'Psychiatry' },
+  { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychology' },
+  { name: 'Dr. Selin Aydın', branch: 'Neurology' },
+]
 const BRANCHES = ['Clinical Psychology', 'Psychiatry', 'Neurology', 'Internal Medicine']
 const SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
 
@@ -102,12 +107,16 @@ function AssistedBooking() {
   const [visitType, setVisitType] = useState('')
   const [note, setNote] = useState('')
   const [booked, setBooked] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const filteredPatients = patientSearch.length > 1
     ? PATIENTS.filter(p => p.name.toLowerCase().includes(patientSearch.toLowerCase()) || p.tc.includes(patientSearch))
     : []
 
-  const canBook = selectedPatient && branch && doctor && date && slot && visitType
+  const availableDoctors = DOCTORS.filter(d => !branch || d.branch === branch)
+  const selectedDoctor = DOCTORS.find(d => d.name === doctor)
+  const activePatient = selectedPatient || (filteredPatients.length === 1 ? filteredPatients[0] : null)
+  const canBook = activePatient && branch && doctor && date && slot && visitType
 
   if (booked) {
     return (
@@ -152,7 +161,13 @@ function AssistedBooking() {
                 style={{ width: '100%', borderRadius: 'var(--r-md)', padding: '8px 12px', border: '1px solid var(--border-md)', fontSize: 13 }}
                 placeholder="Search by TC ID or name..."
                 value={patientSearch}
-                onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null) }}
+                onChange={e => {
+                  const value = e.target.value
+                  setPatientSearch(value)
+                  setSelectedPatient(null)
+                  const exactMatch = PATIENTS.find(p => p.name.toLowerCase() === value.toLowerCase() || p.tc === value)
+                  if (exactMatch) setSelectedPatient(exactMatch)
+                }}
               />
               {filteredPatients.length > 0 && !selectedPatient && (
                 <div style={{
@@ -175,13 +190,13 @@ function AssistedBooking() {
               )}
             </div>
 
-            {selectedPatient && (
+            {activePatient && (
               <div style={{
                 marginTop: 10, padding: '10px 12px', background: 'var(--teal-light)',
                 borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--teal-dark)',
               }}>
                 <i className="ti ti-user-check" style={{ marginRight: 8 }} />
-                <strong>{selectedPatient.name}</strong> · {selectedPatient.email} · {selectedPatient.phone}
+                <strong>{activePatient.name}</strong> · {activePatient.email} · {activePatient.phone}
               </div>
             )}
           </div>
@@ -194,17 +209,37 @@ function AssistedBooking() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Branch</label>
-                <select className="select-input" style={{ width: '100%' }} value={branch} onChange={e => setBranch(e.target.value)}>
+                <select
+                  className="select-input"
+                  style={{ width: '100%' }}
+                  value={branch}
+                  onChange={e => {
+                    setBranch(e.target.value)
+                    if (doctor) {
+                      const valid = DOCTORS.some(d => d.name === doctor && d.branch === e.target.value)
+                      if (!valid) setDoctor('')
+                    }
+                  }}
+                >
                   <option value="">Select branch</option>
                   {BRANCHES.map(b => <option key={b}>{b}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Doctor</label>
-                <select className="select-input" style={{ width: '100%' }} value={doctor} onChange={e => setDoctor(e.target.value)}>
-                  <option value="">Select doctor</option>
-                  {DOCTORS.map(d => <option key={d}>{d}</option>)}
+                <select
+                  className="select-input"
+                  style={{ width: '100%' }}
+                  value={doctor}
+                  onChange={e => setDoctor(e.target.value)}
+                  disabled={!branch}
+                >
+                  <option value="">{branch ? 'Select doctor' : 'Choose branch first'}</option>
+                  {availableDoctors.map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
                 </select>
+                {branch && availableDoctors.length === 0 && (
+                  <div className="text-sm text-muted" style={{ marginTop: 6 }}>No providers available for this branch yet.</div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Date</label>
@@ -236,10 +271,22 @@ function AssistedBooking() {
               />
             </div>
 
+            {errorMessage && (
+              <div style={{ color: 'var(--red-text)', fontSize: 13, marginBottom: 10 }}>{errorMessage}</div>
+            )}
             <button
+              type="button"
               className="btn-primary btn"
               disabled={!canBook}
-              onClick={() => canBook && setBooked(true)}
+              onClick={() => {
+                if (!canBook) {
+                  setErrorMessage('Please select a patient and fill all required fields.')
+                  return
+                }
+                if (!selectedPatient && activePatient) setSelectedPatient(activePatient)
+                setErrorMessage('')
+                setBooked(true)
+              }}
               style={{ opacity: canBook ? 1 : 0.5 }}
             >
               <i className="ti ti-calendar-plus" /> Create Appointment
@@ -253,30 +300,60 @@ function AssistedBooking() {
 
 function AppointmentManagement() {
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [appointments, setAppointments] = useState(APPOINTMENTS)
+  const [message, setMessage] = useState('')
 
-  const filtered = APPOINTMENTS.filter(a =>
-    a.patient.toLowerCase().includes(search.toLowerCase()) ||
-    a.doctor.toLowerCase().includes(search.toLowerCase()) ||
-    a.id.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = appointments.filter(a => {
+    const matchesSearch = a.patient.toLowerCase().includes(search.toLowerCase()) ||
+      a.doctor.toLowerCase().includes(search.toLowerCase()) ||
+      a.id.toLowerCase().includes(search.toLowerCase())
+    const matchesStatus = !statusFilter || a.status.toLowerCase() === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const handleApprove = (id) => {
+    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Confirmed', statusCls: 'badge-green' } : a))
+    setMessage('Appointment approved.')
+  }
+
+  const handleReject = (id) => {
+    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled', statusCls: 'badge-red' } : a))
+    setMessage('Appointment rejected.')
+  }
 
   return (
     <div>
       <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Appointment Management</div>
       <div className="text-sm text-muted mb-4">Search, filter, and update appointment records</div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
           className="text-input"
-          style={{ flex: 1, borderRadius: 'var(--r-md)', padding: '7px 12px', border: '1px solid var(--border-md)', fontSize: 13 }}
+          style={{ flex: 1, minWidth: 250, borderRadius: 'var(--r-md)', padding: '7px 12px', border: '1px solid var(--border-md)', fontSize: 13 }}
           placeholder="Search by patient, doctor or ID..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <select className="select-input"><option>All statuses</option><option>Confirmed</option><option>Pending</option><option>Cancelled</option></select>
+        <select
+          className="select-input"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          style={{ minWidth: 140 }}
+        >
+          <option value="">All statuses</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
         <input type="date" className="select-input" />
       </div>
 
+      {message && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--r-md)', color: 'var(--text-2)' }}>
+          {message}
+        </div>
+      )}
       <div className="card">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
@@ -296,9 +373,25 @@ function AppointmentManagement() {
                 <td style={{ padding: '9px 14px' }}><span className="tag">{a.type}</span></td>
                 <td style={{ padding: '9px 14px' }}><span className={`badge ${a.statusCls}`} style={{ fontSize: 11 }}>{a.status}</span></td>
                 <td style={{ padding: '9px 14px' }}>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 7px' }}><i className="ti ti-edit" /> Edit</button>
-                    <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 7px', color: 'var(--red-text)' }}><i className="ti ti-x" /> Cancel</button>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: 11, padding: '3px 7px' }}
+                      onClick={() => handleApprove(a.id)}
+                      disabled={a.status !== 'Pending'}
+                    >
+                      <i className="ti ti-check" /> Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: 11, padding: '3px 7px', color: 'var(--red-text)' }}
+                      onClick={() => handleReject(a.id)}
+                      disabled={a.status !== 'Pending'}
+                    >
+                      <i className="ti ti-x" /> Reject
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -376,8 +469,12 @@ const NAV = [
   { icon: 'ti-refresh-alert',    label: 'Change Requests',view: 'changes'  },
 ]
 
-export default function StaffPanel() {
-  const [activeView, setActiveView] = useState('dashboard')
+export default function StaffPanel({ defaultView = 'dashboard' }) {
+  const [activeView, setActiveView] = useState(defaultView)
+
+  useEffect(() => {
+    setActiveView(defaultView)
+  }, [defaultView])
 
   return (
     <div className="two-col-layout">

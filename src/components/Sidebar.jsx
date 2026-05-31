@@ -34,12 +34,26 @@ export default function Sidebar({ dark = false, logo = 'Wellsy', badge, navItems
 
       {/* Nav */}
       <nav>
-        {navItems.map((item, i) => (
-          <div key={i} className={`nav-item${item.active ? ' active' : ''}`}>
-            <i className={`ti ${item.icon}`} aria-hidden="true" />
-            {item.label}
-          </div>
-        ))}
+        {navItems.map((item, i) => {
+          const itemClass = `nav-item${item.active ? ' active' : ''}${item.disabled ? ' disabled' : ''}`
+          return item.onClick ? (
+            <button
+              key={i}
+              type="button"
+              className={itemClass}
+              onClick={item.onClick}
+              disabled={item.disabled}
+            >
+              <i className={`ti ${item.icon}`} aria-hidden="true" />
+              {item.label}
+            </button>
+          ) : (
+            <div key={i} className={itemClass}>
+              <i className={`ti ${item.icon}`} aria-hidden="true" />
+              {item.label}
+            </div>
+          )
+        })}
       </nav>
 
       <div className="sidebar-spacer" />

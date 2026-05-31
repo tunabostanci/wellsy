@@ -37,7 +37,7 @@ const DOCTORS = [
   },
 ]
 
-export default function DoctorListing() {
+export default function DoctorListing({ onBack = () => {}, onContinue = () => {} }) {
   const [selected, setSelected] = useState(0)
   const [dateFilter, setDateFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -133,8 +133,8 @@ export default function DoctorListing() {
 
         {/* Action row */}
         <div className="flex gap-2" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn">Back</button>
-          <button className="btn-primary btn">
+          <button type="button" className="btn" onClick={onBack}>Back</button>
+          <button type="button" className="btn-primary btn" onClick={onContinue}>
             Continue to booking <i className="ti ti-arrow-right" aria-hidden="true" />
           </button>
         </div>

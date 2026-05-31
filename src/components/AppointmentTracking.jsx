@@ -55,9 +55,30 @@ const PAST = [
   },
 ]
 
-export default function AppointmentTracking() {
+export default function AppointmentTracking({ onNewAppointment = () => {} }) {
   const [tab, setTab] = useState('upcoming')
-  const list = tab === 'upcoming' ? UPCOMING : PAST
+  const [upcoming, setUpcoming] = useState(UPCOMING)
+  const [past, setPast] = useState(PAST)
+  const [statusMessage, setStatusMessage] = useState('')
+
+  const list = tab === 'upcoming' ? upcoming : past
+
+  const handleReschedule = (index) => {
+    setUpcoming(prev => prev.map((appt, i) => i === index
+      ? { ...appt, status: 'Reschedule requested', statusCls: 'badge-blue' }
+      : appt
+    ))
+    setStatusMessage('Reschedule request submitted.')
+  }
+
+  const handleCancel = (index) => {
+    setUpcoming(prev => {
+      const cancelled = { ...prev[index], status: 'Cancelled', statusCls: 'badge-red' }
+      setPast(old => [cancelled, ...old])
+      return prev.filter((_, i) => i !== index)
+    })
+    setStatusMessage('Appointment cancelled.')
+  }
 
   return (
     <div className="two-col-layout">
@@ -74,7 +95,7 @@ export default function AppointmentTracking() {
       <div className="main-area">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 500 }}>My Appointments</div>
-          <button className="btn-primary btn btn-sm">
+          <button type="button" className="btn-primary btn btn-sm" onClick={onNewAppointment}>
             <i className="ti ti-plus" /> New Appointment
           </button>
         </div>
@@ -104,6 +125,12 @@ export default function AppointmentTracking() {
             </button>
           ))}
         </div>
+
+        {statusMessage && (
+          <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--r-md)', color: 'var(--text-2)' }}>
+            {statusMessage}
+          </div>
+        )}
 
         {/* Appointment cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -147,10 +174,10 @@ export default function AppointmentTracking() {
                   {/* Actions — upcoming only */}
                   {tab === 'upcoming' && (
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn btn-sm" style={{ fontSize: 12 }}>
+                      <button type="button" className="btn btn-sm" style={{ fontSize: 12 }} onClick={() => handleReschedule(i)}>
                         <i className="ti ti-refresh" /> Reschedule
                       </button>
-                      <button className="btn btn-sm" style={{ fontSize: 12, color: 'var(--red-text)' }}>
+                      <button type="button" className="btn btn-sm" style={{ fontSize: 12, color: 'var(--red-text)' }} onClick={() => handleCancel(i)}>
                         <i className="ti ti-x" /> Cancel
                       </button>
                     </div>
