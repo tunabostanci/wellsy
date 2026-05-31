@@ -1,0 +1,91 @@
+CREATE TABLE MEDICINES( -- UST SINIF
+	barcode VARCHAR(13) PRIMARY KEY, -- EAN-13 Strandart
+	medicineName VARCHAR(100) NOT NULL,
+	price DECIMAL(10,2) NOT NULL,
+	stockQuantity INT DEFAULT 0,
+	requiresColdChain BOOLEAN DEFAULT FALSE,
+	manufacturerID INT, 
+	--FOREIGN KEY (manufacturerID) REFERENCES MANUFACTURERS.manufaturerID,
+	sectionID INT -- hangi dolapta, farklı sogukluklar farklı dolaplar
+	--FOREIGN KEY (sectionID) REFERENCES STORAGESECTIONS.sectionID,
+);
+
+CREATE TABLE PRESCRIPTION_MEDICINES( --ALT SINIF
+	barcode VARCHAR(13), --PRIMARY KEY,
+	FOREIGN KEY (barcode) REFERENCES MEDICINES(barcode) ON DELETE CASCADE,
+	prescriptionType VARCHAR(20) NOT NULL --KIRMISI YESIL RECETE VB.
+	requiresReport BOOLEAN DEFAULT FALSE,
+);
+
+CREATE TABLE OTCMEDICINES( --RECETESIZ ILACLAR, ALT SINIF
+	barcode VARCHAR(13), --PRIMARY KEY,
+	FOREIGN KEY (barcode) REFERENCES MEDICINES(barcode) ON DELETE CASCADE,
+	category VARCHAR(50), -- vitamin balik yagı vb.
+	ageLimit INT DEFAULT 0,
+);
+
+-- ############ DEPO - URETICI - TEDARIK TABLOLARI ####################
+
+CREATE TABLE MANUFACTURERS(
+	manufacturerID INT AUTO_INCREMENT PRIMARY KEY, --auto increment kaldırılsın mı?
+	companyName VARCHAR(100) NOT NULL,
+	country VARCHAR(50), --mensei icin
+);
+
+CREATE TABLE STORAGESECTIONS(
+	sectionID INT AUTO_INCREMENT PRIMARY KEY, --auto increment kaldırılsın mı?
+	sectionName VARCHAR(50) NOT NULL, -- EX: ASI DOLABI
+	currentTemperature DECIMAL(4,2),
+);
+
+CREATE TABLE BATCHES(
+	batchNO VARCHAR(30) PRIMARY KEY, --PARTI NUMARASI
+	barcode VARCHAR(13),
+	FOREIGN KEY (barcode) REFERENCES MEDICINES(barcode) ON DELETE CASCADE,
+	productionDate DATE NOT NULL,
+	expirationDate DATE NOT NULL,
+	quantityReceived INT NOT NULL,
+);
+
+-- ######## MANY TO MANY TABLES
+CREATE TABLE  ACTIVEINGREDIENTS(
+	ingredientID INT AUTO_INCREMENT PRIMARY KEY, -- BUNUN gerekliliğinden emin olamadım.
+	chemicalName VARCHAR(100) NOT NULL UNIQUE, --unique olması problem yaratmaz mı?
+	maxDailyDose VARCHAR(30), -- 500MG, 10ML G
+);
+
+CREATE TABLE MEDICINE_INGREDIENTS( --ILAC VE ETKEN MADDE ILISKISI
+	barcode VARCHAR(13),
+	FOREIGN KEY (barcode) REFERENCES MEDICINES(barcode) ON DELETE CASCADE,
+	ingredientID INT,
+	FOREIGN KEY (ingredientID) REFERENCES ACTIVEINGREDIENTS(ingredientID) ON DELETE CASCADE,
+--> Not: Bu iki alan birlikte Composite Primary Key oluşturur.
+);
+
+--##### ECZANE VE SIPARIS
+CREATE TABLE PHARMACIES(
+	sicil_no VARCHAR(13) -- GLN NUMBER YERİNE SİCİL NO KOYDUM DEVLET ONAYLI FALAN GİBİSİNDEN. BELKİ PRİMARY KEY YAPILABİLİR.
+	pharmacyNAme VARCHAR(60),
+	pharmacist VARCHAR(60),
+	city VARCHAR(30) NOT NULL,
+);
+
+CREATE TABLE ORDERS(
+	orderID INT AUTO_INCREMENT PRIMARY KEY,
+	sicil_no VARCHAR(13),
+	FOREIGN KEY (sicil_no) REFERENCES PHARMACIES(sicil_no),
+	orderDate DATE NOT NULL,
+	totalAmount DECIMAL(12,2) DEFAULT 0.00,
+	-- STATUS TUTMAYA GEREK YOK BENCE
+);
+
+CREATE TABLE ORDERDETAILS(
+	orderID INT,
+	FOREIGN KEY(orderID) REFERENCES ORDERS(orderID) ON DELETE CASCADE,
+	barcode VARCHAR(13),
+	FOREIGN KEY (barcode) REFERENCES MEDICINES(barcode) ON DELETE CASCADE,
+	quantity INT NOT NULL,
+	unitPrice DECIMAL(12,2) NOT NULL,
+	PRIMARY KEY(orderID, barcode),
+);
+
