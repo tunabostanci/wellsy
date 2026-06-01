@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 
-const DOCTORS = [
+const SAMPLE_DOCTORS = [
   {
     initials: 'AK',
     avatarBg: '#E1F5EE', avatarColor: '#0F6E56',
@@ -11,7 +11,7 @@ const DOCTORS = [
     tags: ['Anxiety disorders', 'CBT', 'Stress management'],
     date: '13 May', time: '14:00', visit: 'Online',
     visitIcon: 'ti-device-laptop',
-    match: 95, rating: 4.9, stars: '★★★★★',
+    match_score: 95, rating: 4.9, stars: '★★★★★',
   },
   {
     initials: 'MY',
@@ -22,7 +22,7 @@ const DOCTORS = [
     tags: ['Anxiety', 'Depression', 'Group therapy'],
     date: '12 May', time: '16:30', visit: 'In-person',
     visitIcon: 'ti-users',
-    match: 88, rating: 4.8, stars: '★★★★☆',
+    match_score: 88, rating: 4.8, stars: '★★★★☆',
   },
   {
     initials: 'ZD',
@@ -33,7 +33,7 @@ const DOCTORS = [
     tags: ['Stress management', 'Mindfulness', 'Sleep therapy'],
     date: '14 May', time: '10:00', visit: 'Online',
     visitIcon: 'ti-device-laptop',
-    match: 82, rating: 4.7, stars: '★★★★☆',
+    match_score: 82, rating: 4.7, stars: '★★★★☆',
   },
 ]
 
@@ -41,8 +41,35 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
   const [selected, setSelected] = useState(0)
   const [dateFilter, setDateFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [doctors, setDoctors] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const filtered = DOCTORS.filter(d => {
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        const response = await fetch(`${apiBase}/api/doctors`)
+        if (!response.ok) {
+          throw new Error(`Backend returned ${response.status}`)
+        }
+        const data = await response.json()
+        setDoctors(data)
+        if (data.length > 0) setSelected(0)
+      } catch (fetchError) {
+        console.error('Doctor fetch failed:', fetchError)
+        setError('Unable to load doctors from backend. Showing sample data instead.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDoctors()
+  }, [apiBase])
+
+  const doctorList = doctors.length > 0 ? doctors : SAMPLE_DOCTORS
+  const filtered = doctorList.filter(d => {
     if (typeFilter === 'online' && d.visit !== 'Online') return false
     if (typeFilter === 'in-person' && d.visit !== 'In-person') return false
     return true
@@ -52,10 +79,10 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
     <div className="two-col-layout">
       <Sidebar
         navItems={[
-          { icon: 'ti-message-chatbot', label: 'Chatbot'       },
-          { icon: 'ti-stethoscope',     label: 'Choose doctor', active: true },
-          { icon: 'ti-calendar',        label: 'Appointments'  },
-          { icon: 'ti-user',            label: 'Profile'       },
+          { icon: 'ti-message-chatbot', label: 'Chatbot', onClick: onBack },
+          { icon: 'ti-stethoscope',     label: 'Choose doctor', active: true, onClick: () => {} },
+          { icon: 'ti-calendar',        label: 'Appointments', onClick: onContinue },
+          { icon: 'ti-user',            label: 'Profile', onClick: () => {} },
         ]}
         user={{ initials: 'TB', name: 'Tuna B.', role: 'Patient' }}
       />
@@ -85,6 +112,9 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
           </select>
         </div>
 
+        {loading && <div className="alert alert-info" style={{ marginBottom: 16 }}>Loading doctors from the backend...</div>}
+        {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+
         {/* Doctor cards */}
         <div className="flex-col gap-2 mb-4">
           {filtered.map((doc, i) => (
@@ -108,7 +138,7 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
                 <div className="font-medium mb-1">{doc.name}</div>
                 <div className="text-xs text-muted mb-2">{doc.specialty} · {doc.clinic}</div>
                 <div className="flex gap-1 flex-wrap mb-2">
-                  {doc.tags.map(t => <span key={t} className="tag">{t}</span>)}
+                  {(Array.isArray(doc.tags) ? doc.tags : (doc.tags ? [doc.tags] : [])).map(t => <span key={t} className="tag">{t}</span>)}
                 </div>
                 <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-3)' }}>
                   <span><i className="ti ti-calendar-event" aria-hidden="true" /> {doc.date}</span>
@@ -118,7 +148,7 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
               </div>
 
               <div className="flex-col items-end gap-2" style={{ flexShrink: 0 }}>
-                <span className="badge badge-teal" style={{ fontSize: 12 }}>{doc.match}% match</span>
+                <span className="badge badge-teal" style={{ fontSize: 12 }}>{doc.match_score ?? doc.match}% match</span>
                 <div className="stars">{doc.stars} <span style={{ color: 'var(--text-3)' }}>{doc.rating}</span></div>
                 <button
                   className={selected === i ? 'btn-primary btn btn-sm' : 'btn btn-sm'}

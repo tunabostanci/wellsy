@@ -55,7 +55,7 @@ const PAST = [
   },
 ]
 
-export default function AppointmentTracking({ onNewAppointment = () => {} }) {
+export default function AppointmentTracking({ onNewAppointment = () => {}, onChatbot = () => {}, onChooseDoctor = () => {}, onProfile = () => {} }) {
   const [tab, setTab] = useState('upcoming')
   const [upcoming, setUpcoming] = useState(UPCOMING)
   const [past, setPast] = useState(PAST)
@@ -84,10 +84,10 @@ export default function AppointmentTracking({ onNewAppointment = () => {} }) {
     <div className="two-col-layout">
       <Sidebar
         navItems={[
-          { icon: 'ti-message-chatbot', label: 'Chatbot'       },
-          { icon: 'ti-stethoscope',     label: 'Choose doctor' },
+          { icon: 'ti-message-chatbot', label: 'Chatbot', onClick: onChatbot },
+          { icon: 'ti-stethoscope',     label: 'Choose doctor', onClick: onChooseDoctor },
           { icon: 'ti-calendar',        label: 'Appointments', active: true },
-          { icon: 'ti-user',            label: 'Profile'       },
+          { icon: 'ti-user',            label: 'Profile', onClick: onProfile },
         ]}
         user={{ initials: 'TB', name: 'Tuna B.', role: 'Patient' }}
       />

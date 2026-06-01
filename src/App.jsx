@@ -50,10 +50,15 @@ export default function App() {
           />
         )}
         {active === 'appts' && (
-          <AppointmentTracking onNewAppointment={() => {
-            setStaffDefaultView('booking')
-            setActive('staff')
-          }} />
+          <AppointmentTracking
+            onNewAppointment={() => {
+              setStaffDefaultView('booking')
+              setActive('staff')
+            }}
+            onChatbot={() => setActive('chatbot')}
+            onChooseDoctor={() => setActive('doctors')}
+            onProfile={() => setActive('dashboard')}
+          />
         )}
         {active === 'dashboard' && <DoctorDashboard />}
         {active === 'staff' && <StaffPanel defaultView={staffDefaultView} />}

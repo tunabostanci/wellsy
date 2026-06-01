@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
 /* ── Mock data ───────────────────────────────────────────────────── */
 const CHANGE_REQUESTS = [
   {
@@ -40,13 +42,38 @@ const PATIENTS = [
 ]
 
 const DOCTORS = [
-  { name: 'Dr. Ayşe Kaya', branch: 'Clinical Psychology' },
-  { name: 'Dr. Mehmet Yılmaz', branch: 'Psychiatry' },
-  { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychology' },
+  { name: 'Dr. Ayşe Kaya', branch: 'Clinical Psychologist' },
+  { name: 'Dr. Mehmet Yılmaz', branch: 'Psychiatrist' },
+  { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychologist' },
   { name: 'Dr. Selin Aydın', branch: 'Neurology' },
 ]
-const BRANCHES = ['Clinical Psychology', 'Psychiatry', 'Neurology', 'Internal Medicine']
+const BRANCHES = ['Clinical Psychologist', 'Psychiatrist', 'Neurology', 'Internal Medicine']
 const SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
+
+function calculateUrgency(description) {
+  const text = (description || '').toLowerCase()
+  if (!text.trim()) {
+    return { label: 'Belirlenmedi', badge: 'badge-amber' }
+  }
+
+  const urgentWords = ['şiddetli', 'acı', 'şok', 'nefes', 'kanama', 'bayıl', 'kalp', 'angina', 'göğüs', 'hızlı', 'solunum', 'şuur', 'bilinç', 'göğüs ağrısı']
+  const highWords = ['sürekli', 'yüksek ateş', 'ateş', 'şişlik', 'ağrı', 'kusma', 'baş dönmesi', 'baş ağrısı', 'nefes darlığı']
+  const moderateWords = ['hafif', 'yavaş', 'uzun süren', 'rahatsızlık', 'halsizlik', 'yorgunluk']
+
+  if (urgentWords.some(word => text.includes(word))) {
+    return { label: 'Acil', badge: 'badge-red' }
+  }
+
+  if (highWords.some(word => text.includes(word))) {
+    return { label: 'Yüksek', badge: 'badge-amber' }
+  }
+
+  if (moderateWords.some(word => text.includes(word))) {
+    return { label: 'Orta', badge: 'badge-blue' }
+  }
+
+  return { label: 'Düşük', badge: 'badge-green' }
+}
 
 /* ── Sub-views ───────────────────────────────────────────────────── */
 function StaffDashboard() {
@@ -100,6 +127,10 @@ function StaffDashboard() {
 function AssistedBooking() {
   const [patientSearch, setPatientSearch] = useState('')
   const [selectedPatient, setSelectedPatient] = useState(null)
+  const [patientEmail, setPatientEmail] = useState('')
+  const [patientPhone, setPatientPhone] = useState('')
+  const [patientTc, setPatientTc] = useState('')
+  const [symptomDescription, setSymptomDescription] = useState('')
   const [branch, setBranch] = useState('')
   const [doctor, setDoctor] = useState('')
   const [date, setDate] = useState('')
@@ -107,37 +138,134 @@ function AssistedBooking() {
   const [visitType, setVisitType] = useState('')
   const [note, setNote] = useState('')
   const [booked, setBooked] = useState(false)
+  const [bookingInfo, setBookingInfo] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [doctors, setDoctors] = useState([])
+  const [patients, setPatients] = useState([])
 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [docRes, patRes] = await Promise.all([
+          fetch(`${API_URL}/api/doctors`),
+          fetch(`${API_URL}/api/patients`),
+        ])
+
+        if (!docRes.ok || !patRes.ok) {
+          throw new Error('Unable to load doctors or patients from the backend.')
+        }
+
+        setDoctors(await docRes.json())
+        setPatients(await patRes.json())
+      } catch (err) {
+        console.error(err)
+        setErrorMessage('Unable to load doctors or patients. Please refresh or try again later.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  const patientOptions = patients.length > 0 ? patients : PATIENTS
   const filteredPatients = patientSearch.length > 1
-    ? PATIENTS.filter(p => p.name.toLowerCase().includes(patientSearch.toLowerCase()) || p.tc.includes(patientSearch))
+    ? patientOptions.filter(p => p.name.toLowerCase().includes(patientSearch.toLowerCase()) || p.tc?.includes(patientSearch))
     : []
 
-  const availableDoctors = DOCTORS.filter(d => !branch || d.branch === branch)
-  const selectedDoctor = DOCTORS.find(d => d.name === doctor)
-  const activePatient = selectedPatient || (filteredPatients.length === 1 ? filteredPatients[0] : null)
-  const canBook = activePatient && branch && doctor && date && slot && visitType
+  const doctorOptions = doctors.length > 0
+    ? doctors.map(d => ({ name: d.name, branch: d.specialty || 'General' }))
+    : DOCTORS
 
-  if (booked) {
+  const availableDoctors = doctorOptions.filter(d => !branch || d.branch === branch)
+  const activePatient = selectedPatient || (filteredPatients.length === 1 ? filteredPatients[0] : null)
+  const activePatientName = activePatient ? activePatient.name : patientSearch
+  const activePatientEmail = activePatient ? activePatient.email : patientEmail
+  const activePatientPhone = activePatient ? activePatient.phone : patientPhone
+  const activePatientTc = activePatient ? activePatient.tc : patientTc
+  const urgency = calculateUrgency(symptomDescription)
+  const canBook = activePatientName && activePatientEmail && branch && doctor && date && slot && visitType && symptomDescription.trim()
+
+  const resetForm = () => {
+    setBooked(false)
+    setBookingInfo(null)
+    setSelectedPatient(null)
+    setPatientSearch('')
+    setPatientEmail('')
+    setPatientPhone('')
+    setPatientTc('')
+    setBranch('')
+    setDoctor('')
+    setDate('')
+    setSlot('')
+    setVisitType('')
+    setNote('')
+    setErrorMessage('')
+  }
+
+  const handleBook = async () => {
+    if (!canBook) {
+      setErrorMessage('Please select a patient and complete all required fields.')
+      return
+    }
+
+    setErrorMessage('')
+
+    try {
+      const response = await fetch(`${API_URL}/api/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_name: activePatientName,
+          patient_tc: activePatientTc || '',
+          patient_email: activePatientEmail,
+          patient_phone: activePatientPhone || '',
+          doctor_name: doctor,
+          appointment_date: date,
+          appointment_time: slot,
+          type: visitType,
+          note: symptomDescription.trim() ? `${symptomDescription.trim()}${note ? ' — ' + note.trim() : ''}` : note,
+        }),
+      })
+
+      const body = await response.json()
+      if (!response.ok) {
+        throw new Error(body?.error || 'Unable to create appointment')
+      }
+
+      setBookingInfo(body)
+      setBooked(true)
+      setSelectedPatient(null)
+    } catch (err) {
+      console.error(err)
+      setErrorMessage(err.message || 'Unable to create appointment.')
+    }
+  }
+
+  if (loading) {
+    return <div className="card" style={{ padding: 24 }}>Loading clinic resources...</div>
+  }
+
+  if (booked && bookingInfo) {
     return (
-      <div style={{ maxWidth: 500, margin: '0 auto' }}>
+      <div style={{ maxWidth: 540, margin: '0 auto' }}>
         <div className="card" style={{ padding: 24, textAlign: 'center' }}>
           <i className="ti ti-circle-check" style={{ fontSize: 40, color: 'var(--teal)', marginBottom: 12 }} />
           <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8 }}>Appointment Created Successfully</div>
-          <div className="text-sm text-muted mb-4">The appointment details have been sent to the patient.</div>
+          <div className="text-sm text-muted mb-4">The appointment has been saved to the clinic system.</div>
           <div style={{
             background: 'var(--bg-surface)', borderRadius: 'var(--r-md)',
             padding: '14px 16px', textAlign: 'left', marginBottom: 16, fontSize: 13,
           }}>
-            <div><strong>Patient:</strong> {selectedPatient?.name}</div>
-            <div><strong>Doctor:</strong> {doctor}</div>
-            <div><strong>Date:</strong> {date} {slot}</div>
-            <div><strong>Type:</strong> {visitType}</div>
+            <div><strong>Appointment ID:</strong> {bookingInfo.id}</div>
+            <div><strong>Patient:</strong> {bookingInfo.patient}</div>
+            <div><strong>Doctor:</strong> {bookingInfo.doctor}</div>
+            <div><strong>Date:</strong> {bookingInfo.date} {bookingInfo.time}</div>
+            <div><strong>Type:</strong> {bookingInfo.type}</div>
+            <div><strong>Status:</strong> {bookingInfo.status}</div>
           </div>
-          <button className="btn-primary btn btn-sm" onClick={() => {
-            setBooked(false); setSelectedPatient(null); setPatientSearch('')
-            setBranch(''); setDoctor(''); setDate(''); setSlot(''); setVisitType(''); setNote('')
-          }}>
+          <button className="btn-primary btn btn-sm" onClick={resetForm}>
             Create New Appointment
           </button>
         </div>
@@ -151,22 +279,26 @@ function AssistedBooking() {
       <div className="text-sm text-muted mb-4">Create a new appointment on behalf of the patient</div>
 
       <div style={{ maxWidth: 560 }}>
-        {/* Patient search */}
         <div className="card" style={{ marginBottom: 14 }}>
-          <div className="card-header">Patient Search</div>
-          <div style={{ padding: 14 }}>
+          <div className="card-header">Patient Information</div>
+          <div style={{ padding: 14, display: 'grid', gap: 12 }}>
             <div style={{ position: 'relative' }}>
               <input
                 className="text-input"
                 style={{ width: '100%', borderRadius: 'var(--r-md)', padding: '8px 12px', border: '1px solid var(--border-md)', fontSize: 13 }}
-                placeholder="Search by TC ID or name..."
+                placeholder="Search existing patient by TC or name..."
                 value={patientSearch}
                 onChange={e => {
                   const value = e.target.value
                   setPatientSearch(value)
                   setSelectedPatient(null)
-                  const exactMatch = PATIENTS.find(p => p.name.toLowerCase() === value.toLowerCase() || p.tc === value)
-                  if (exactMatch) setSelectedPatient(exactMatch)
+                  const exactMatch = patientOptions.find(p => p.name.toLowerCase() === value.toLowerCase() || p.tc === value)
+                  if (exactMatch) {
+                    setSelectedPatient(exactMatch)
+                    setPatientEmail(exactMatch.email || '')
+                    setPatientPhone(exactMatch.phone || '')
+                    setPatientTc(exactMatch.tc || '')
+                  }
                 }}
               />
               {filteredPatients.length > 0 && !selectedPatient && (
@@ -180,29 +312,108 @@ function AssistedBooking() {
                     <div
                       key={i}
                       style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, borderBottom: i < filteredPatients.length - 1 ? '0.5px solid var(--border)' : 'none' }}
-                      onClick={() => { setSelectedPatient(p); setPatientSearch(p.name) }}
+                      onClick={() => {
+                        setSelectedPatient(p)
+                        setPatientSearch(p.name)
+                        setPatientEmail(p.email || '')
+                        setPatientPhone(p.phone || '')
+                        setPatientTc(p.tc || '')
+                      }}
                     >
                       <strong>{p.name}</strong>
-                      <span style={{ color: 'var(--text-3)', marginLeft: 10 }}>{p.tc} · {p.phone}</span>
+                      <span style={{ color: 'var(--text-3)', marginLeft: 10 }}>{p.tc || p.email}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {activePatient && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Patient Name</label>
+                <input
+                  className="text-input"
+                  style={{ width: '100%' }}
+                  value={activePatientName}
+                  onChange={e => {
+                    setPatientSearch(e.target.value)
+                    setSelectedPatient(null)
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>TC / National ID</label>
+                <input
+                  className="text-input"
+                  style={{ width: '100%' }}
+                  value={activePatientTc || ''}
+                  onChange={e => {
+                    setPatientTc(e.target.value)
+                    setSelectedPatient(null)
+                  }}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Email</label>
+                <input
+                  className="text-input"
+                  style={{ width: '100%' }}
+                  value={activePatientEmail || ''}
+                  onChange={e => {
+                    setPatientEmail(e.target.value)
+                    setSelectedPatient(null)
+                  }}
+                  placeholder="Required"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Phone</label>
+                <input
+                  className="text-input"
+                  style={{ width: '100%' }}
+                  value={activePatientPhone || ''}
+                  onChange={e => {
+                    setPatientPhone(e.target.value)
+                    setSelectedPatient(null)
+                  }}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Hastalık / Şikayet Açıklaması</label>
+              <textarea
+                className="text-input"
+                style={{ width: '100%', minHeight: 96, resize: 'vertical' }}
+                placeholder="Hasta durumu ne kadar acil? Örneğin: şiddetli baş ağrısı, nefes darlığı, ateş..."
+                value={symptomDescription}
+                onChange={e => setSymptomDescription(e.target.value)}
+              />
+              {symptomDescription.trim() && (
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Triage seviyesi:</span>
+                  <span className={`badge ${urgency.badge}`}>{urgency.label}</span>
+                </div>
+              )}
+            </div>
+
+            {selectedPatient && (
               <div style={{
                 marginTop: 10, padding: '10px 12px', background: 'var(--teal-light)',
                 borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--teal-dark)',
               }}>
                 <i className="ti ti-user-check" style={{ marginRight: 8 }} />
-                <strong>{activePatient.name}</strong> · {activePatient.email} · {activePatient.phone}
+                <strong>{selectedPatient.name}</strong> · {selectedPatient.email} · {selectedPatient.phone}
               </div>
             )}
           </div>
         </div>
 
-        {/* Appointment details */}
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-header">Appointment Details</div>
           <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -216,7 +427,7 @@ function AssistedBooking() {
                   onChange={e => {
                     setBranch(e.target.value)
                     if (doctor) {
-                      const valid = DOCTORS.some(d => d.name === doctor && d.branch === e.target.value)
+                      const valid = doctorOptions.some(d => d.name === doctor && d.branch === e.target.value)
                       if (!valid) setDoctor('')
                     }
                   }}
@@ -278,15 +489,7 @@ function AssistedBooking() {
               type="button"
               className="btn-primary btn"
               disabled={!canBook}
-              onClick={() => {
-                if (!canBook) {
-                  setErrorMessage('Please select a patient and fill all required fields.')
-                  return
-                }
-                if (!selectedPatient && activePatient) setSelectedPatient(activePatient)
-                setErrorMessage('')
-                setBooked(true)
-              }}
+              onClick={handleBook}
               style={{ opacity: canBook ? 1 : 0.5 }}
             >
               <i className="ti ti-calendar-plus" /> Create Appointment
@@ -303,6 +506,37 @@ function AppointmentManagement() {
   const [statusFilter, setStatusFilter] = useState('')
   const [appointments, setAppointments] = useState(APPOINTMENTS)
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/appointments`)
+        if (!response.ok) {
+          throw new Error('Unable to load appointments.')
+        }
+        const rows = await response.json()
+        setAppointments(rows.map(a => ({
+          id: `#APT-${a.id.toString().padStart(4, '0')}`,
+          patient: a.patient,
+          doctor: a.doctor,
+          date: a.date,
+          time: a.time,
+          type: a.type,
+          status: a.status,
+          statusCls: a.status.toLowerCase() === 'confirmed' ? 'badge-green' : a.status.toLowerCase() === 'cancelled' ? 'badge-red' : 'badge-amber',
+        })))
+      } catch (err) {
+        console.error(err)
+        setError('Unable to load appointments. Showing local history only.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAppointments()
+  }, [])
 
   const filtered = appointments.filter(a => {
     const matchesSearch = a.patient.toLowerCase().includes(search.toLowerCase()) ||
@@ -404,13 +638,31 @@ function AppointmentManagement() {
 }
 
 function ChangeRequests() {
+  const [requests, setRequests] = useState(CHANGE_REQUESTS)
+  const [statusMessage, setStatusMessage] = useState('')
+
+  const updateRequest = (index, status) => {
+    setRequests(prev => prev.map((req, i) => i === index ? {
+      ...req,
+      status,
+      statusCls: status === 'Approved' ? 'badge-green' : status === 'Cancelled' ? 'badge-red' : req.statusCls,
+    } : req))
+    setStatusMessage(status === 'Approved' ? 'Request approved.' : 'Request rejected.')
+  }
+
   return (
     <div>
       <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Change Requests</div>
       <div className="text-sm text-muted mb-4">Process cancellation and rescheduling requests</div>
 
+      {statusMessage && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--r-md)', color: 'var(--text-2)' }}>
+          {statusMessage}
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {CHANGE_REQUESTS.map((req, i) => (
+        {requests.map((req, i) => (
           <div key={i} className="card" style={{ padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -419,14 +671,14 @@ function ChangeRequests() {
               </div>
               {req.status === 'Pending' && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-primary btn btn-sm" style={{ fontSize: 11 }}>
+                  <button className="btn-primary btn btn-sm" style={{ fontSize: 11 }} onClick={() => updateRequest(i, 'Approved')}>
                     <i className="ti ti-check" /> Approve
                   </button>
-                  <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--red-text)' }}>
+                  <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--red-text)' }} onClick={() => updateRequest(i, 'Cancelled')}>
                     <i className="ti ti-x" /> Reject
                   </button>
                   {req.type === 'Reschedule' && (
-                    <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--teal)' }}>
+                    <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--teal)' }} onClick={() => updateRequest(i, 'Rescheduled')}>
                       <i className="ti ti-clock" /> Set New Time
                     </button>
                   )}
