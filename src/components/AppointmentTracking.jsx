@@ -1,71 +1,53 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 
-const UPCOMING = [
-  {
-    id: '#APT-2026-8412',
-    doctor: 'Dr. Ayşe Kaya',
-    specialty: 'Clinical Psychologist',
-    clinic: 'Psikoloji Kliniği, İstanbul',
-    date: '13 May 2026',
-    time: '14:00',
-    type: 'Online',
-    status: 'Confirmed',
-    statusCls: 'badge-green',
-    initials: 'AK', avatarBg: '#E1F5EE', avatarColor: '#0F6E56',
-  },
-  {
-    id: '#APT-2026-8398',
-    doctor: 'Dr. Mehmet Yılmaz',
-    specialty: 'Psychiatrist',
-    clinic: 'Ruh Sağlığı Merkezi, Ankara',
-    date: '20 May 2026',
-    time: '10:30',
-    type: 'In-person',
-    status: 'Pending',
-    statusCls: 'badge-amber',
-    initials: 'MY', avatarBg: '#E6F1FB', avatarColor: '#185FA5',
-  },
-]
-
-const PAST = [
-  {
-    id: '#APT-2026-8320',
-    doctor: 'Dr. Ayşe Kaya',
-    specialty: 'Clinical Psychologist',
-    clinic: 'Psikoloji Kliniği, İstanbul',
-    date: '01 Apr 2026',
-    time: '14:00',
-    type: 'Online',
-    status: 'Completed',
-    statusCls: 'badge-green',
-    initials: 'AK', avatarBg: '#E1F5EE', avatarColor: '#0F6E56',
-  },
-  {
-    id: '#APT-2026-8201',
-    doctor: 'Dr. Zeynep Demir',
-    specialty: 'Clinical Psychologist',
-    clinic: 'Psikoloji Kliniği, İstanbul',
-    date: '14 Mar 2026',
-    time: '11:00',
-    type: 'Online',
-    status: 'Cancelled',
-    statusCls: '',
-    initials: 'ZD', avatarBg: '#FAEEDA', avatarColor: '#854F0B',
-  },
-]
-
-export default function AppointmentTracking({ onNewAppointment = () => {}, onChatbot = () => {}, onChooseDoctor = () => {}, onProfile = () => {} }) {
+export default function AppointmentTracking({ patient, onNewAppointment = () => {}, onChatbot = () => {}, onChooseDoctor = () => {}, onProfile = () => {} }) {
   const [tab, setTab] = useState('upcoming')
-  const [upcoming, setUpcoming] = useState(UPCOMING)
-  const [past, setPast] = useState(PAST)
+  const [upcoming, setUpcoming] = useState([])
+  const [past, setPast] = useState([])
   const [statusMessage, setStatusMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
+  useEffect(() => {
+    if (!patient?.id) return
+
+    const loadAppointments = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const response = await fetch(`${API_URL}/api/patients/${patient.id}/appointments`)
+        if (!response.ok) {
+          throw new Error('Unable to load appointments')
+        }
+        const appointments = await response.json()
+
+        // Split into upcoming and past based on date
+        const now = new Date()
+        const upcomingList = appointments.filter(a => new Date(a.date) >= now).sort((a, b) => new Date(a.date) - new Date(b.date))
+        const pastList = appointments.filter(a => new Date(a.date) < now).sort((a, b) => new Date(b.date) - new Date(a.date))
+
+        setUpcoming(upcomingList)
+        setPast(pastList)
+      } catch (err) {
+        console.error(err)
+        setError(err.message || 'Unable to load appointments')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAppointments()
+  }, [patient?.id, API_URL])
 
   const list = tab === 'upcoming' ? upcoming : past
 
   const handleReschedule = (index) => {
     setUpcoming(prev => prev.map((appt, i) => i === index
-      ? { ...appt, status: 'Reschedule requested', statusCls: 'badge-blue' }
+      ? { ...appt, status: 'Reschedule requested' }
       : appt
     ))
     setStatusMessage('Reschedule request submitted.')
@@ -73,7 +55,7 @@ export default function AppointmentTracking({ onNewAppointment = () => {}, onCha
 
   const handleCancel = (index) => {
     setUpcoming(prev => {
-      const cancelled = { ...prev[index], status: 'Cancelled', statusCls: 'badge-red' }
+      const cancelled = { ...prev[index], status: 'Cancelled' }
       setPast(old => [cancelled, ...old])
       return prev.filter((_, i) => i !== index)
     })
@@ -89,7 +71,7 @@ export default function AppointmentTracking({ onNewAppointment = () => {}, onCha
           { icon: 'ti-calendar',        label: 'Appointments', active: true },
           { icon: 'ti-user',            label: 'Profile', onClick: onProfile },
         ]}
-        user={{ initials: 'TB', name: 'Tuna B.', role: 'Patient' }}
+        user={{ initials: patient?.name?.[0] || 'P', name: patient?.name || 'Patient', role: 'Patient' }}
       />
 
       <div className="main-area">
@@ -100,11 +82,17 @@ export default function AppointmentTracking({ onNewAppointment = () => {}, onCha
           </button>
         </div>
 
+        {error && (
+          <div className="alert alert-error" style={{ marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '0.5px solid var(--border)', marginBottom: 16 }}>
           {[
-            { key: 'upcoming', label: `Upcoming (${UPCOMING.length})` },
-            { key: 'past',     label: `Past (${PAST.length})` },
+            { key: 'upcoming', label: `Upcoming (${upcoming.length})` },
+            { key: 'past',     label: `Past (${past.length})` },
           ].map(t => (
             <button
               key={t.key}
@@ -134,58 +122,83 @@ export default function AppointmentTracking({ onNewAppointment = () => {}, onCha
 
         {/* Appointment cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {list.map((appt, i) => (
-            <div key={i} className="card" style={{ padding: 16 }}>
-              <div style={{ display: 'flex', gap: 14 }}>
-                {/* Avatar */}
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%',
-                  background: appt.avatarBg, color: appt.avatarColor,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 600, flexShrink: 0,
-                }}>
-                  {appt.initials}
-                </div>
+          {loading ? (
+            <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>
+              Loading appointments...
+            </div>
+          ) : list.length === 0 ? (
+            <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>
+              No {tab} appointments yet.
+            </div>
+          ) : (
+            list.map((appt, i) => (
+              <div key={i} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', gap: 14 }}>
+                  {/* Avatar */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: '#E1F5EE', color: '#0F6E56',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 14, fontWeight: 600, flexShrink: 0,
+                  }}>
+                    {appt.doctor?.[0] || 'D'}
+                  </div>
 
-                {/* Info */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{appt.doctor}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{appt.specialty}</div>
+                  {/* Info */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{appt.doctor}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{appt.doctor_specialty}</div>
+                      </div>
+                      <span className={`badge ${
+                        appt.status === 'Confirmed' ? 'badge-green' :
+                        appt.status === 'Pending' ? 'badge-amber' :
+                        appt.status === 'Cancelled' ? 'badge-red' :
+                        'badge-blue'
+                      }`} style={{ fontSize: 11, marginLeft: 8 }}>
+                        {appt.status}
+                      </span>
                     </div>
-                    <span className={`badge ${appt.statusCls}`} style={{ fontSize: 11, marginLeft: 8 }}>{appt.status}</span>
-                  </div>
 
-                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-2)', marginBottom: 10 }}>
-                    <span><i className="ti ti-map-pin" style={{ marginRight: 4 }} />{appt.clinic}</span>
-                  </div>
+                    {appt.clinic && (
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-2)', marginBottom: 10 }}>
+                        <span><i className="ti ti-map-pin" style={{ marginRight: 4 }} />{appt.clinic}</span>
+                      </div>
+                    )}
 
-                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
-                    <span><i className="ti ti-calendar" style={{ marginRight: 4 }} />{appt.date}</span>
-                    <span><i className="ti ti-clock" style={{ marginRight: 4 }} />{appt.time}</span>
-                    <span><i className={`ti ${appt.type === 'Online' ? 'ti-device-laptop' : 'ti-users'}`} style={{ marginRight: 4 }} />{appt.type}</span>
-                  </div>
-
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', marginBottom: tab === 'upcoming' ? 12 : 0 }}>
-                    {appt.id}
-                  </div>
-
-                  {/* Actions — upcoming only */}
-                  {tab === 'upcoming' && (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" className="btn btn-sm" style={{ fontSize: 12 }} onClick={() => handleReschedule(i)}>
-                        <i className="ti ti-refresh" /> Reschedule
-                      </button>
-                      <button type="button" className="btn btn-sm" style={{ fontSize: 12, color: 'var(--red-text)' }} onClick={() => handleCancel(i)}>
-                        <i className="ti ti-x" /> Cancel
-                      </button>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
+                      <span><i className="ti ti-calendar" style={{ marginRight: 4 }} />{appt.date}</span>
+                      <span><i className="ti ti-clock" style={{ marginRight: 4 }} />{appt.time}</span>
+                      <span><i className={`ti ${appt.type === 'Online' ? 'ti-device-laptop' : 'ti-users'}`} style={{ marginRight: 4 }} />{appt.type}</span>
                     </div>
-                  )}
+
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', marginBottom: tab === 'upcoming' ? 12 : 0 }}>
+                      #{appt.id}
+                    </div>
+
+                    {appt.note && (
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: tab === 'upcoming' ? 12 : 0 }}>
+                        <strong>Note:</strong> {appt.note}
+                      </div>
+                    )}
+
+                    {/* Actions — upcoming only */}
+                    {tab === 'upcoming' && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button type="button" className="btn btn-sm" style={{ fontSize: 12 }} onClick={() => handleReschedule(i)}>
+                          <i className="ti ti-refresh" /> Reschedule
+                        </button>
+                        <button type="button" className="btn btn-sm" style={{ fontSize: 12, color: 'var(--red-text)' }} onClick={() => handleCancel(i)}>
+                          <i className="ti ti-x" /> Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>

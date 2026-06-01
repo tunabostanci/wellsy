@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 config()
 
 const PORT = process.env.PORT || 4000
-const DATABASE_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@db:5432/pharmastock'
+const DATABASE_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/pharmastock'
 
 const pool = new Pool({ connectionString: DATABASE_URL })
 const app = express()
@@ -320,6 +320,114 @@ app.post('/api/appointments', async (req, res) => {
   `, [appointmentResult.rows[0].id])
 
   res.status(201).json(result.rows[0])
+})
+
+// Doctor login
+app.post('/api/doctor-login', async (req, res) => {
+  const { email } = req.body
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required.' })
+  }
+
+  try {
+    const result = await pool.query('SELECT id, name, email, specialty, clinic FROM doctors WHERE email = $1', [email])
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Doctor not found. Please check your email.' })
+    }
+
+    const doctor = result.rows[0]
+    res.json({ doctor })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Unable to log in.' })
+  }
+})
+
+// Patient login
+app.post('/api/patient-login', async (req, res) => {
+  const { email } = req.body
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required.' })
+  }
+
+  try {
+    const result = await pool.query('SELECT id, name, email, phone, tc, role FROM patients WHERE email = $1', [email])
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Patient not found. Please check your email.' })
+    }
+
+    const patient = result.rows[0]
+    res.json({ patient })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Unable to log in.' })
+  }
+})
+
+// Get doctor's patients (doctors can only see their own patients)
+app.get('/api/doctors/:doctor_id/patients', async (req, res) => {
+  const { doctor_id } = req.params
+
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT p.id, p.name, p.email, p.phone, p.tc
+      FROM patients p
+      JOIN appointments a ON a.patient_id = p.id
+      WHERE a.doctor_id = $1
+      ORDER BY p.name
+    `, [doctor_id])
+
+    res.json(result.rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Unable to load patients.' })
+  }
+})
+
+// Get patient's appointments
+app.get('/api/patients/:patient_id/appointments', async (req, res) => {
+  const { patient_id } = req.params
+
+  try {
+    const result = await pool.query(`
+      SELECT a.id, a.appointment_date AS date, a.appointment_time AS time, a.type, a.status, a.note,
+             d.id AS doctor_id, d.name AS doctor, d.specialty AS doctor_specialty, d.clinic, d.email AS doctor_email
+      FROM appointments a
+      JOIN doctors d ON d.id = a.doctor_id
+      WHERE a.patient_id = $1
+      ORDER BY a.appointment_date DESC, a.appointment_time DESC
+    `, [patient_id])
+
+    res.json(result.rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Unable to load appointments.' })
+  }
+})
+
+// Get doctor's appointments
+app.get('/api/doctors/:doctor_id/appointments', async (req, res) => {
+  const { doctor_id } = req.params
+
+  try {
+    const result = await pool.query(`
+      SELECT a.id, a.appointment_date AS date, a.appointment_time AS time, a.type, a.status, a.note,
+             p.id AS patient_id, p.name AS patient, p.email AS patient_email, p.phone AS patient_phone
+      FROM appointments a
+      JOIN patients p ON p.id = a.patient_id
+      WHERE a.doctor_id = $1
+      ORDER BY a.appointment_date DESC, a.appointment_time DESC
+    `, [doctor_id])
+
+    res.json(result.rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Unable to load appointments.' })
+  }
 })
 
 app.use((req, res) => {
