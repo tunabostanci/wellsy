@@ -4,9 +4,10 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: pharmastock
+      POSTGRES_DB: wellsy_db
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - C:\Users\ardab\Desktop\PharmaStock\PharmaStock\db\init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - '5432:5432'
     healthcheck:
@@ -20,7 +21,7 @@ services:
       context: ./server
     environment:
       PORT: 4000
-      DATABASE_URL: postgres://postgres:postgres@db:5432/pharmastock
+      DATABASE_URL: postgres://postgres:postgres@db:5432/wellsy_db
     depends_on:
       db:
         condition: service_healthy

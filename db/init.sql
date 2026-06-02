@@ -59,3 +59,8 @@ CREATE TABLE IF NOT EXISTS appointments (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT unique_doctor_app_slot UNIQUE (doctor_id, appointment_date, appointment_time)
 );
+
+-- init.sql dosyasının en altına ekleyin:
+INSERT INTO patients (name, tc, email, password, phone, role)
+VALUES ('Sistem Yöneticisi', '45678901234', 'admin@wellsy.com', 'admin123', '0536 999 88 77', 'Admin')
+ON CONFLICT (email) DO NOTHING;
