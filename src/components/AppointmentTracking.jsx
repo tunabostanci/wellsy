@@ -159,10 +159,25 @@ export default function AppointmentTracking({ patient, onNewAppointment = () => 
       <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>
         {appt.doctor_specialty} • <span className="text-muted">{appt.clinic}</span>
       </div>
-      {appt.note && (
-        <div style={{ fontSize: 12, color: '#667781', marginTop: 6, fontStyle: 'italic' }}>
-          <strong>Notunuz:</strong> {appt.note}
-        </div>
+      {appt.note && appt.note.includes('=== PATIENT EXTRA NOTE ===') ? (
+        (() => {
+          // Sadece hastanın kendi el yazısıyla eklediği notu ayıklıyoruz
+          const extraNote = appt.note.split('=== PATIENT EXTRA NOTE ===')[1]?.trim();
+          
+          // Eğer ayıklanan not boş değilse ekrana basıyoruz
+          return extraNote ? (
+            <div style={{ fontSize: 12, color: '#667781', marginTop: 6 }}>
+              <strong>Notunuz:</strong> {extraNote}
+            </div>
+          ) : null;
+        })()
+      ) : (
+        // Eski sürümden kalan veya doğrudan düz metin olarak girilmiş normal notlar için uyumluluk katmanı
+        appt.note && !appt.note.includes('=== AI CHATBOT PRE-DIAGNOSIS HISTORY ===') ? (
+          <div style={{ fontSize: 12, color: '#667781', marginTop: 6, fontStyle: 'italic' }}>
+            <strong>Notunuz:</strong> {appt.note}
+          </div>
+        ) : null
       )}
       
       {/* CANLI İPTAL ETME BUTONU: Sadece Onaylı veya Bekleyen randevularda çıkar */}

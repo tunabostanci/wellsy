@@ -2,7 +2,8 @@ import { useState } from 'react'
 
 const AVAILABLE_SLOTS = ['09:00', '10:00', '11:00', '11:30', '13:30', '14:00', '15:30', '16:00']
 
-export default function AppointmentBookingGrid({ doctor, patient, onBack, onBookingComplete }) {
+// CRITICAL FIX: chatHistory prop olarak yukarıdan (App.jsx köprüsünden) içeri alınıyor
+export default function AppointmentBookingGrid({ doctor, patient, chatHistory, onBack, onBookingComplete }) {
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [appointmentDate, setAppointmentDate] = useState('2026-06-15')
   const [note, setNote] = useState('')
@@ -21,6 +22,15 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
     setLoading(true)
     setError('')
 
+    // Yapay zeka konuşma geçmişi ile kullanıcının ekstra yazdığı notu tek bir metinde birleştiriyoruz
+    let finalNote = '';
+    if (chatHistory && chatHistory.trim() !== '') {
+      finalNote += `=== AI CHATBOT PRE-DIAGNOSIS HISTORY ===\n${chatHistory}\n\n`;
+    }
+    if (note.trim() !== '') {
+      finalNote += `=== PATIENT EXTRA NOTE ===\n${note.trim()}`;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
@@ -33,7 +43,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
           appointment_date: appointmentDate,
           appointment_time: selectedSlot,
           type: 'Online',
-          note: note.trim()
+          note: finalNote.trim() // Birleştirilmiş akıllı notu veritabanına gönderiyoruz
         }),
       })
 
@@ -43,7 +53,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
       setSuccess(true)
       setTimeout(() => {
         onBookingComplete()
-      }, 2500) // Kullanıcının bilgilendirme metnini rahat okuması için süre hafif uzatıldı
+      }, 2500)
 
     } catch (err) {
       setError(err.message || 'Bir çakışma hatası oluştu.')
@@ -52,7 +62,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
     }
   }
 
-  // ONAY EKRANI: SRS/SDD İş Akışına Göre Güncellendi (Pending Vurgusu Eklendi)
+  // ONAY EKRANI
   if (success) {
     return (
       <div style={{ padding: '40px 20px', textAlign: 'center', maxWidth: 450, margin: '50px auto', background: 'white', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderTop: '6px solid #854F0B' }}>
@@ -132,10 +142,17 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
             </div>
           </div>
 
+          {/* Bilgilendirme Rozeti */}
+          {chatHistory && chatHistory.trim() !== '' && (
+            <div style={{ background: '#E1F5EE', color: '#0F6E56', padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="ti ti-sparkles" style={{ fontSize: 16 }} /> AI Chatbot konuşma analiziniz bu randevuya otomatik olarak eklenmiştir.
+            </div>
+          )}
+
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: '#111b21', display: 'block', marginBottom: 8 }}>Doktora İletmek İstediğiniz Not</label>
             <textarea
-              className="text-input" placeholder="Belirtileriniz hakkında eklemek istediğiniz bir detay var mı?"
+              className="text-input" placeholder="Belirtileriniz hakkında eklemek istediğiniz ek bir detay var mı?"
               value={note} onChange={e => setNote(e.target.value)}
               style={{ width: '100%', height: 80, resize: 'none', borderRadius: 8, padding: 12, fontSize: 13 }}
               disabled={loading}

@@ -105,6 +105,7 @@ export default function App() {
             <AppointmentBookingGrid
               doctor={selectedDoctor}
               patient={user}
+              chatHistory={aiChatHistory}
               onBack={() => setActive('doctors')}
               onBookingComplete={() => {
                 setAiChatHistory('') // Randevu başarıyla tamamlandığında AI geçmişini sıfırlıyoruz
