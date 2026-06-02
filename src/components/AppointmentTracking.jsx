@@ -1,205 +1,100 @@
 import { useEffect, useState } from 'react'
-import Sidebar from './Sidebar.jsx'
 
-export default function AppointmentTracking({ patient, onNewAppointment = () => {}, onChatbot = () => {}, onChooseDoctor = () => {}, onProfile = () => {} }) {
+export default function AppointmentTracking({ patient, onNewAppointment = () => {}, onChatbot = () => {}, onChooseDoctor = () => {} }) {
   const [tab, setTab] = useState('upcoming')
   const [upcoming, setUpcoming] = useState([])
   const [past, setPast] = useState([])
-  const [statusMessage, setStatusMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  const API_URL = 'http://localhost:4000'
+
+  const loadAppointments = async () => {
+    if (!patient?.id) return
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API_URL}/api/patients/${patient.id}/appointments`)
+      if (!response.ok) throw new Error('Randevular yüklenemedi.')
+      const appointments = await response.json()
+
+      // Güvenli Tarih Karşılaştırması: Saatleri sıfırlayarak sadece güne bakıyoruz
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const upcomingList = appointments.filter(a => {
+        const apptDate = new Date(a.date)
+        apptDate.setHours(0, 0, 0, 0)
+        return apptDate >= today
+      }).sort((a, b) => new Date(a.date) - new Date(b.date))
+
+      const pastList = appointments.filter(a => {
+        const apptDate = new Date(a.date)
+        apptDate.setHours(0, 0, 0, 0)
+        return apptDate < today
+      }).sort((a, b) => new Date(b.date) - new Date(a.date))
+
+      setUpcoming(upcomingList)
+      setPast(pastList)
+    } catch (err) {
+      console.error(err)
+      setError('Randevu geçmişi veritabanından çekilirken hata oluştu.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (!patient?.id) return
-
-    const loadAppointments = async () => {
-      setLoading(true)
-      setError('')
-
-      try {
-        const response = await fetch(`${API_URL}/api/patients/${patient.id}/appointments`)
-        if (!response.ok) {
-          throw new Error('Unable to load appointments')
-        }
-        const appointments = await response.json()
-
-        // Split into upcoming and past based on date
-        const now = new Date()
-        const upcomingList = appointments.filter(a => new Date(a.date) >= now).sort((a, b) => new Date(a.date) - new Date(b.date))
-        const pastList = appointments.filter(a => new Date(a.date) < now).sort((a, b) => new Date(b.date) - new Date(a.date))
-
-        setUpcoming(upcomingList)
-        setPast(pastList)
-      } catch (err) {
-        console.error(err)
-        setError(err.message || 'Unable to load appointments')
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadAppointments()
-  }, [patient?.id, API_URL])
+  }, [patient])
 
-  const list = tab === 'upcoming' ? upcoming : past
-
-  const handleReschedule = (index) => {
-    setUpcoming(prev => prev.map((appt, i) => i === index
-      ? { ...appt, status: 'Reschedule requested' }
-      : appt
-    ))
-    setStatusMessage('Reschedule request submitted.')
-  }
-
-  const handleCancel = (index) => {
-    setUpcoming(prev => {
-      const cancelled = { ...prev[index], status: 'Cancelled' }
-      setPast(old => [cancelled, ...old])
-      return prev.filter((_, i) => i !== index)
-    })
-    setStatusMessage('Appointment cancelled.')
-  }
+  const currentList = tab === 'upcoming' ? upcoming : past
 
   return (
-    <div className="two-col-layout">
-      <Sidebar
-        navItems={[
-          { icon: 'ti-message-chatbot', label: 'Chatbot', onClick: onChatbot },
-          { icon: 'ti-stethoscope',     label: 'Choose doctor', onClick: onChooseDoctor },
-          { icon: 'ti-calendar',        label: 'Appointments', active: true },
-          { icon: 'ti-user',            label: 'Profile', onClick: onProfile },
-        ]}
-        user={{ initials: patient?.name?.[0] || 'P', name: patient?.name || 'Patient', role: 'Patient' }}
-      />
-
-      <div className="main-area">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 500 }}>My Appointments</div>
-          <button type="button" className="btn-primary btn btn-sm" onClick={onNewAppointment}>
-            <i className="ti ti-plus" /> New Appointment
-          </button>
+    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2>Randevularım</h2>
+          <p className="text-sm text-muted"> Wellsye kayıtlı güncel ve geçmiş randevu takibiniz.</p>
         </div>
+        <button type="button" className="btn-primary btn" onClick={onNewAppointment} style={{ borderRadius: '20px', background: '#008069', border: 'none' }}>
+          <i className="ti ti-plus" /> Yeni Randevu Al
+        </button>
+      </div>
 
-        {error && (
-          <div className="alert alert-error" style={{ marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
+      {/* Sekme Seçimi */}
+      <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid var(--border)', marginBottom: 20, paddingBottom: 8 }}>
+        <button type="button" style={{ background: 'none', border: 'none', fontWeight: tab === 'upcoming' ? '600' : '400', color: tab === 'upcoming' ? '#008069' : '#667781', cursor: 'pointer', fontSize: '14px' }} onClick={() => setMode('upcoming') || setTab('upcoming')}>
+          Yaklaşan Randevular ({upcoming.length})
+        </button>
+        <button type="button" style={{ background: 'none', border: 'none', fontWeight: tab === 'past' ? '600' : '400', color: tab === 'past' ? '#008069' : '#667781', cursor: 'pointer', fontSize: '14px' }} onClick={() => setTab('past')}>
+          Geçmiş Randevular ({past.length})
+        </button>
+      </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '0.5px solid var(--border)', marginBottom: 16 }}>
-          {[
-            { key: 'upcoming', label: `Upcoming (${upcoming.length})` },
-            { key: 'past',     label: `Past (${past.length})` },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderBottom: tab === t.key ? '2px solid var(--teal)' : '2px solid transparent',
-                background: 'none',
-                color: tab === t.key ? 'var(--teal-dark)' : 'var(--text-3)',
-                fontWeight: tab === t.key ? 500 : 400,
-                fontSize: 13,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      {loading && <div className="alert alert-info">Randevu kayıtlarınız PostgreSQL'den yükleniyor...</div>}
+      {error && <div className="alert alert-error">{error}</div>}
 
-        {statusMessage && (
-          <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--r-md)', color: 'var(--text-2)' }}>
-            {statusMessage}
-          </div>
-        )}
+      {!loading && !error && currentList.length === 0 && (
+        <div className="alert alert-warning">Bu kategoride henüz bir randevunuz bulunmamaktadır.</div>
+      )}
 
-        {/* Appointment cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {loading ? (
-            <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>
-              Loading appointments...
+      <div style={{ display: 'grid', gap: 12 }}>
+        {currentList.map((appt) => (
+          <div key={appt.id} className="card" style={{ padding: 16, background: 'white', borderRadius: 8, borderLeft: tab === 'upcoming' ? '4px solid #008069' : '4px solid #667781', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{appt.doctor}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>{appt.doctor_specialty} • <span className="text-muted">{appt.clinic}</span></div>
+              {appt.note && <div style={{ fontSize: 12, color: '#667781', marginTop: 6, italic: 'true' }}><strong>Notunuz:</strong> {appt.note}</div>}
             </div>
-          ) : list.length === 0 ? (
-            <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>
-              No {tab} appointments yet.
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontWeight: 600, color: '#008069', fontSize: 14 }}><i className="ti ti-calendar" /> {appt.date}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}><i className="ti ti-clock" /> Saat: {appt.time}</div>
+              <span className={`badge`} style={{ marginTop: 6, display: 'inline-block', background: appt.status === 'Confirmed' ? '#e1f5ee' : '#fff3cd', color: appt.status === 'Confirmed' ? '#0F6E56' : '#854F0B' }}>{appt.status}</span>
             </div>
-          ) : (
-            list.map((appt, i) => (
-              <div key={i} className="card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', gap: 14 }}>
-                  {/* Avatar */}
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: '#E1F5EE', color: '#0F6E56',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, fontWeight: 600, flexShrink: 0,
-                  }}>
-                    {appt.doctor?.[0] || 'D'}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{appt.doctor}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{appt.doctor_specialty}</div>
-                      </div>
-                      <span className={`badge ${
-                        appt.status === 'Confirmed' ? 'badge-green' :
-                        appt.status === 'Pending' ? 'badge-amber' :
-                        appt.status === 'Cancelled' ? 'badge-red' :
-                        'badge-blue'
-                      }`} style={{ fontSize: 11, marginLeft: 8 }}>
-                        {appt.status}
-                      </span>
-                    </div>
-
-                    {appt.clinic && (
-                      <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-2)', marginBottom: 10 }}>
-                        <span><i className="ti ti-map-pin" style={{ marginRight: 4 }} />{appt.clinic}</span>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
-                      <span><i className="ti ti-calendar" style={{ marginRight: 4 }} />{appt.date}</span>
-                      <span><i className="ti ti-clock" style={{ marginRight: 4 }} />{appt.time}</span>
-                      <span><i className={`ti ${appt.type === 'Online' ? 'ti-device-laptop' : 'ti-users'}`} style={{ marginRight: 4 }} />{appt.type}</span>
-                    </div>
-
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', marginBottom: tab === 'upcoming' ? 12 : 0 }}>
-                      #{appt.id}
-                    </div>
-
-                    {appt.note && (
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: tab === 'upcoming' ? 12 : 0 }}>
-                        <strong>Note:</strong> {appt.note}
-                      </div>
-                    )}
-
-                    {/* Actions — upcoming only */}
-                    {tab === 'upcoming' && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="button" className="btn btn-sm" style={{ fontSize: 12 }} onClick={() => handleReschedule(i)}>
-                          <i className="ti ti-refresh" /> Reschedule
-                        </button>
-                        <button type="button" className="btn btn-sm" style={{ fontSize: 12, color: 'var(--red-text)' }} onClick={() => handleCancel(i)}>
-                          <i className="ti ti-x" /> Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   )

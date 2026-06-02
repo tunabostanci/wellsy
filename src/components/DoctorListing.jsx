@@ -1,173 +1,80 @@
 import { useEffect, useState } from 'react'
-import Sidebar from './Sidebar.jsx'
-
-const SAMPLE_DOCTORS = [
-  {
-    initials: 'AK',
-    avatarBg: '#E1F5EE', avatarColor: '#0F6E56',
-    name: 'Dr. Ayşe Kaya',
-    specialty: 'Clinical Psychologist',
-    clinic: 'İstanbul Psikoloji Kliniği',
-    tags: ['Anxiety disorders', 'CBT', 'Stress management'],
-    date: '13 May', time: '14:00', visit: 'Online',
-    visitIcon: 'ti-device-laptop',
-    match_score: 95, rating: 4.9, stars: '★★★★★',
-  },
-  {
-    initials: 'MY',
-    avatarBg: '#E6F1FB', avatarColor: '#185FA5',
-    name: 'Dr. Mehmet Yılmaz',
-    specialty: 'Psychiatrist',
-    clinic: 'Ruh Sağlığı Merkezi, Ankara',
-    tags: ['Anxiety', 'Depression', 'Group therapy'],
-    date: '12 May', time: '16:30', visit: 'In-person',
-    visitIcon: 'ti-users',
-    match_score: 88, rating: 4.8, stars: '★★★★☆',
-  },
-  {
-    initials: 'ZD',
-    avatarBg: '#FAEEDA', avatarColor: '#854F0B',
-    name: 'Dr. Zeynep Demir',
-    specialty: 'Clinical Psychologist',
-    clinic: 'İstanbul Psikoloji Kliniği',
-    tags: ['Stress management', 'Mindfulness', 'Sleep therapy'],
-    date: '14 May', time: '10:00', visit: 'Online',
-    visitIcon: 'ti-device-laptop',
-    match_score: 82, rating: 4.7, stars: '★★★★☆',
-  },
-]
 
 export default function DoctorListing({ onBack = () => {}, onContinue = () => {} }) {
-  const [selected, setSelected] = useState(0)
-  const [dateFilter, setDateFilter] = useState('all')
-  const [typeFilter, setTypeFilter] = useState('all')
   const [doctors, setDoctors] = useState([])
+  const [selectedIdx, setSelectedIdx] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  const API_URL = 'http://localhost:4000'
 
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const response = await fetch(`${apiBase}/api/doctors`)
-        if (!response.ok) {
-          throw new Error(`Backend returned ${response.status}`)
-        }
-        const data = await response.json()
-        setDoctors(data)
-        if (data.length > 0) setSelected(0)
-      } catch (fetchError) {
-        console.error('Doctor fetch failed:', fetchError)
-        setError('Unable to load doctors from backend. Showing sample data instead.')
+        setLoading(true)
+        const response = await fetch(`${API_URL}/api/doctors`)
+        if (!response.ok) throw new Error('Doktor listesi çekilemedi.')
+        setDoctors(await response.json())
+      } catch (err) {
+        setError('Doktor verileri çekilirken hata oluştu.')
       } finally {
         setLoading(false)
       }
     }
-
     loadDoctors()
-  }, [apiBase])
-
-  const doctorList = doctors.length > 0 ? doctors : SAMPLE_DOCTORS
-  const filtered = doctorList.filter(d => {
-    if (typeFilter === 'online' && d.visit !== 'Online') return false
-    if (typeFilter === 'in-person' && d.visit !== 'In-person') return false
-    return true
-  })
+  }, [])
 
   return (
-    <div className="two-col-layout">
-      <Sidebar
-        navItems={[
-          { icon: 'ti-message-chatbot', label: 'Chatbot', onClick: onBack },
-          { icon: 'ti-stethoscope',     label: 'Choose doctor', active: true, onClick: () => {} },
-          { icon: 'ti-calendar',        label: 'Appointments', onClick: onContinue },
-          { icon: 'ti-user',            label: 'Profile', onClick: () => {} },
-        ]}
-        user={{ initials: 'TB', name: 'Tuna B.', role: 'Patient' }}
-      />
+    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
+      <h2>Available Doctors</h2>
+      <p className="text-sm text-muted mb-4">Select a doctor to continue with your appointment booking.</p>
 
-      <div className="main-area">
-        <div className="mb-1" style={{ fontSize: 18, fontWeight: 500 }}>Recommended specialists</div>
-        <div className="text-sm text-muted mb-3">
-          Psychology &amp; Psychiatry experts — suggested by AI based on your symptoms
-        </div>
+      {loading && <div className="alert alert-info">Veritabanından doktorlar yükleniyor...</div>}
+      {error && <div className="alert alert-error">{error}</div>}
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-4 flex-wrap">
-          <select className="select-input" value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
-            <option value="all">All dates</option>
-            <option value="week">This week</option>
-            <option value="next">Next week</option>
-          </select>
-          <select className="select-input" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-            <option value="all">All visit types</option>
-            <option value="online">Online</option>
-            <option value="in-person">In-person</option>
-          </select>
-          <select className="select-input">
-            <option>Any time</option>
-            <option>Morning</option>
-            <option>Afternoon</option>
-          </select>
-        </div>
-
-        {loading && <div className="alert alert-info" style={{ marginBottom: 16 }}>Loading doctors from the backend...</div>}
-        {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
-
-        {/* Doctor cards */}
-        <div className="flex-col gap-2 mb-4">
-          {filtered.map((doc, i) => (
-            <div
-              key={i}
-              className={`doctor-card${selected === i ? ' selected' : ''}`}
-              onClick={() => setSelected(i)}
-              role="button"
-              tabIndex={0}
-              aria-pressed={selected === i}
-              onKeyDown={e => e.key === 'Enter' && setSelected(i)}
-            >
-              <div
-                className="doc-avatar"
-                style={{ background: doc.avatarBg, color: doc.avatarColor }}
-              >
-                {doc.initials}
+      <div className="flex-col gap-3" style={{ marginBottom: 24 }}>
+        {doctors.map((doc, i) => (
+          <div
+            key={doc.id || i}
+            className={`card doctor-card flex justify-between items-center`}
+            style={{
+              padding: 16, cursor: 'pointer',
+              border: selectedIdx === i ? '2px solid var(--teal)' : '1px solid var(--border)',
+              backgroundColor: selectedIdx === i ? 'var(--teal-light)' : 'white', borderRadius: '8px'
+            }}
+            onClick={() => setSelectedIdx(i)}
+          >
+            <div className="flex gap-3 items-center">
+              <div className="avatar" style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: doc.avatarBg || '#E1F5EE', color: doc.avatarColor || '#0F6E56', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                {doc.initials || 'DR'}
               </div>
-
-              <div className="flex-1">
-                <div className="font-medium mb-1">{doc.name}</div>
-                <div className="text-xs text-muted mb-2">{doc.specialty} · {doc.clinic}</div>
-                <div className="flex gap-1 flex-wrap mb-2">
-                  {(Array.isArray(doc.tags) ? doc.tags : (doc.tags ? [doc.tags] : [])).map(t => <span key={t} className="tag">{t}</span>)}
+              <div>
+                <div style={{ fontWeight: 600 }}>{doc.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{doc.specialty} • <span className="text-muted">{doc.clinic}</span></div>
+                <div className="flex gap-1 flex-wrap" style={{ marginTop: 6 }}>
+                  {(doc.tags || []).map((tag, idx) => (
+                    <span key={idx} className="tag" style={{ fontSize: 11, padding: '2px 8px', background: '#f0f2f5', borderRadius: '4px' }}>{tag}</span>
+                  ))}
                 </div>
-                <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-3)' }}>
-                  <span><i className="ti ti-calendar-event" aria-hidden="true" /> {doc.date}</span>
-                  <span><i className="ti ti-clock" aria-hidden="true" /> {doc.time}</span>
-                  <span><i className={`ti ${doc.visitIcon}`} aria-hidden="true" /> {doc.visit}</span>
-                </div>
-              </div>
-
-              <div className="flex-col items-end gap-2" style={{ flexShrink: 0 }}>
-                <span className="badge badge-teal" style={{ fontSize: 12 }}>{doc.match_score ?? doc.match}% match</span>
-                <div className="stars">{doc.stars} <span style={{ color: 'var(--text-3)' }}>{doc.rating}</span></div>
-                <button
-                  className={selected === i ? 'btn-primary btn btn-sm' : 'btn btn-sm'}
-                  onClick={e => { e.stopPropagation(); setSelected(i) }}
-                >
-                  {selected === i ? 'Selected' : 'Select'}
-                </button>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="flex-col items-end" style={{ flexShrink: 0 }}>
+              <span className="badge badge-teal">{doc.match_score || 100}% match</span>
+              <div style={{ fontSize: 13, color: 'var(--amber)', marginTop: 4 }}>{doc.stars || '★★★★★'}</div>
+            </div>
+          </div>
+        ))}
+      </div>
 
-        {/* Action row */}
-        <div className="flex gap-2" style={{ justifyContent: 'flex-end' }}>
-          <button type="button" className="btn" onClick={onBack}>Back</button>
-          <button type="button" className="btn-primary btn" onClick={onContinue}>
-            Continue to booking <i className="ti ti-arrow-right" aria-hidden="true" />
-          </button>
-        </div>
+      <div className="flex gap-2" style={{ justifyContent: 'flex-end' }}>
+        <button className="btn" onClick={onBack}>Geri Dön</button>
+        <button 
+          className="btn-primary btn" 
+          disabled={selectedIdx === null} 
+          onClick={() => onContinue(doctors[selectedIdx])} // CRITICAL: Seçilen tam doktor nesnesi paslanıyor
+        >
+          Randevuya İlerle
+        </button>
       </div>
     </div>
   )

@@ -13,13 +13,18 @@ const pool = new Pool({
 })
 
 const app = express()
-app.use(cors())
+
+// CORS Ayarları
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
 app.use(express.json())
 
-// SQL dosyasındaki şemaya tam uyumlu veri ekleme ve denetleme mekanizması
+// Veritabanı Şeması ve Başlatma (initDb)
 async function initDb() {
   try {
-    // Şemaların init.sql ile birebir örtüştüğünden emin oluyoruz
     await pool.query(`
       CREATE TABLE IF NOT EXISTS doctors (
         id SERIAL PRIMARY KEY,
@@ -28,6 +33,7 @@ async function initDb() {
         specialty TEXT,
         clinic TEXT,
         email TEXT UNIQUE,
+        password TEXT DEFAULT 'wellsy123',
         tags TEXT[],
         date TEXT,
         time TEXT,
@@ -48,6 +54,7 @@ async function initDb() {
         name TEXT NOT NULL,
         tc TEXT UNIQUE,
         email TEXT UNIQUE,
+        password TEXT DEFAULT 'wellsy123',
         phone TEXT,
         role TEXT DEFAULT 'Patient',
         created_at TIMESTAMPTZ DEFAULT NOW()
@@ -69,52 +76,102 @@ async function initDb() {
       );
     `)
 
-    // SRS hiyerarşisindeki eksik Admin ve Staff kullanıcıları şemaya ekleniyor
+    // Varsayılan Kullanıcı Tohumlamaları (Seed)
     await pool.query(`
-      INSERT INTO patients (name, tc, email, phone, role)
+      INSERT INTO patients (name, tc, email, password, phone, role)
       VALUES 
-        ('Mustafa Mert Cemil', '34567890123', 'mert@wellsy.com', '0535 111 22 33', 'Staff'),
-        ('Sistem Yöneticisi', '45678901234', 'admin@wellsy.com', '0536 999 88 77', 'admin')
+        ('Mustafa Mert Cemil', '34567890123', 'mert@wellsy.com', 'staff123', '0535 111 22 33', 'Staff'),
+        ('Sistem Yöneticisi', '45678901234', 'admin@wellsy.com', 'admin123', '0536 999 88 77', 'admin')
       ON CONFLICT (email) DO NOTHING;
     `)
 
-    console.log("PostgreSQL veritabanı bağlantısı ve şemaları başarıyla doğrulandı.")
+    console.log("PostgreSQL şemaları ve şifreli kimlik doğrulaması başarıyla senkronize edildi.")
   } catch (err) {
     console.error('Veritabanı senkronizasyon hatası:', err)
   }
 }
 
+// Sağlık Kontrolü (Health Check)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', database: 'PostgreSQL' })
 })
 
-// Doktorları listelerken tags zaten ARRAY (Dizi) olduğu için JSON.parse işlemine gerek kalmadı
-app.get('/api/doctors', async (req, res) => {
+// 1. HASTALARI LİSTELEME
+app.get('/api/patients', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM doctors ORDER BY id')
+    const result = await pool.query('SELECT id, name, tc, email, phone, role FROM patients ORDER BY id')
     res.json(result.rows)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Yeni doktor eklerken tags bilgisini direkt PostgreSQL ARRAY formatında ($6 yerine {} veya array geçişi) kaydediyoruz
-app.post('/api/doctors', async (req, res) => {
-  const { initials='', name, specialty='', clinic='', email='', tags=[], date='', time='', visit='Online', visitIcon='ti-device-laptop', match_score=0, rating=0, stars='', avatarBg='#E1F5EE', avatarColor='#0F6E56' } = req.body
-  if (!name) return res.status(400).json({ error: 'Doctor name is required.' })
-
+// 2. DOKTORLARI LİSTELEME
+app.get('/api/doctors', async (req, res) => {
   try {
-    const result = await pool.query(`
-      INSERT INTO doctors (initials, name, specialty, clinic, email, tags, date, time, visit, visitIcon, match_score, rating, stars, avatarBg, avatarColor)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *
-    `, [initials, name, specialty, clinic, email, tags, date, time, visit, visitIcon, match_score, rating, stars, avatarBg, avatarColor])
-    res.status(201).json(result.rows[0])
+    const result = await pool.query('SELECT * FROM doctors ORDER BY id')
+    const parsedDoctors = result.rows.map(d => ({
+      ...d,
+      tags: Array.isArray(d.tags) ? d.tags : []
+    }))
+    res.json(parsedDoctors)
   } catch (err) {
-    res.status(400).json({ error: err.message })
+    res.status(500).json({ error: err.message })
   }
 })
 
-// SRS F7: Çift rezervasyonu engelleyen güvenli ortak randevu endpoint'i
+// 3. ADMIN: DOKTOR HESABI OLUŞTURMA
+app.post('/api/admin/create-doctor', async (req, res) => {
+  const { name, specialty, clinic, email, password, tags = [] } = req.body
+  if (!name || !email || !password) return res.status(400).json({ error: 'İsim, e-posta ve şifre zorunludur.' })
+
+  try {
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    const result = await pool.query(`
+      INSERT INTO doctors (initials, name, specialty, clinic, email, password, tags, date, time, visit, visitIcon, match_score, rating, stars, avatarBg, avatarColor)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'Her gün', '09:00-17:00', 'Online', 'ti-device-laptop', 100, 5.0, '★★★★★', '#E1F5EE', '#0F6E56') RETURNING id, name, email
+    `, [initials, name, specialty, clinic, email, password, tags])
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    res.status(400).json({ error: 'Bu e-posta adresiyle bir doktor zaten mevcut.' })
+  }
+})
+
+// 4. ADMIN: STAFF/ADMIN OLUŞTURMA
+app.post('/api/admin/create-staff', async (req, res) => {
+  const { name, email, password, role } = req.body
+  if (!name || !email || !password || !role) return res.status(400).json({ error: 'Tüm alanlar zorunludur.' })
+
+  try {
+    const result = await pool.query(`
+      INSERT INTO patients (name, email, password, role) 
+      VALUES ($1, $2, $3, $4) RETURNING id, name, email, role
+    `, [name, email, password, role])
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    res.status(400).json({ error: 'Bu e-posta adresiyle kayıtlı bir kullanıcı zaten mevcut.' })
+  }
+})
+
+// 5. TÜM RANDEVULARI LİSTELEME (StaffPanel için)
+app.get('/api/appointments', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT a.id, a.appointment_date::TEXT AS date, a.appointment_time AS time, a.type, a.status, a.note,
+             p.id AS patient_id, p.name AS patient, p.email AS patient_email, p.phone AS patient_phone,
+             d.id AS doctor_id, d.name AS doctor, d.specialty AS doctor_specialty
+      FROM appointments a
+      JOIN patients p ON p.id = a.patient_id
+      JOIN doctors d ON d.id = a.doctor_id
+      ORDER BY a.appointment_date DESC, a.appointment_time DESC
+    `)
+    res.json(result.rows)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// 6. YENİ RANDEVU KAYDETME (Parantezleri İzole Edilmiş ve Düzeltilmiş Hali)
 app.post('/api/appointments', async (req, res) => {
   const { patient_name, patient_tc = '', patient_email = '', doctor_name, appointment_date, appointment_time, type = 'Online', note = '' } = req.body
 
@@ -133,7 +190,6 @@ app.post('/api/appointments', async (req, res) => {
     }
     const doctor_id = doctorResult.rows[0].id
 
-    // Veri tipi uyuşmazlığını engellemek için appointment_date açıkça DATE tipine cast ediliyor
     const slotCheck = await client.query(
       'SELECT id FROM appointments WHERE doctor_id = $1 AND appointment_date = $2::DATE AND appointment_time = $3',
       [doctor_id, appointment_date, appointment_time]
@@ -169,36 +225,34 @@ app.post('/api/appointments', async (req, res) => {
   }
 })
 
-// SRS & SDD Uyumlu Birleşik Güvenli Giriş Endpoint'i
+// 7. SİSTEME GİRİŞ YAPMA (LOGIN)
 app.post('/api/auth/login', async (req, res) => {
-  const { email, role } = req.body
+  const { email, password, role } = req.body
 
-  if (!email || !role) {
-    return res.status(400).json({ error: 'E-posta adresi ve rol seçimi zorunludur.' })
+  if (!email || !password || !role) {
+    return res.status(400).json({ error: 'E-posta, şifre ve rol alanları zorunludur.' })
   }
 
   try {
     if (role === 'doctor') {
-      const result = await pool.query('SELECT id, name, email, specialty, clinic, \'doctor\' as role FROM doctors WHERE email = $1', [email])
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'Bu e-postaya ait doktor kaydı bulunamadı.' })
+      const result = await pool.query('SELECT id, name, email, password, specialty, clinic, \'doctor\' as role FROM doctors WHERE email = $1', [email.trim()])
+      if (result.rowCount === 0 || result.rows[0].password !== password) {
+        return res.status(401).json({ error: 'E-posta adresi veya şifre hatalı.' })
       }
       return res.json({ user: result.rows[0] })
     } else {
-      // Patient, Staff ve Admin rollerini küçük/büyük harf duyarlılığı olmadan eşleştirir
-      const result = await pool.query('SELECT id, name, email, phone, tc, role FROM patients WHERE email = $1 AND LOWER(role) = $2', [email, role.toLowerCase()])
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: `Kayıtlı ${role} kullanıcısı bulunamadı. Lütfen bilgilerinizi kontrol edin.` })
+      const result = await pool.query('SELECT id, name, email, password, phone, tc, role FROM patients WHERE email = $1 AND LOWER(role) = $2', [email.trim(), role.toLowerCase()])
+      if (result.rowCount === 0 || result.rows[0].password !== password) {
+        return res.status(401).json({ error: 'E-posta adresi veya şifre hatalı.' })
       }
       return res.json({ user: result.rows[0] })
     }
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Giriş esnasında sistemsel bir hata oluştu.' })
+    res.status(500).json({ error: 'Sistemsel giriş hatası.' })
   }
 })
 
-// Diğer standart API listeleme endpoint'leri
+// 8. HASTANIN KENDİ RANDEVULARINI LİSTELEME
 app.get('/api/patients/:patient_id/appointments', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -213,11 +267,12 @@ app.get('/api/patients/:patient_id/appointments', async (req, res) => {
   }
 })
 
+// 9. DOKTORUN KENDİ RANDEVULARINI LİSTELEME
 app.get('/api/doctors/:doctor_id/appointments', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT a.id, a.appointment_date::TEXT AS date, a.appointment_time AS time, a.type, a.status, a.note,
-             p.id AS patient_id, p.name AS patient, p.email AS patient_email
+             p.id AS patient_id, p.name AS patient, p.email AS patient_email, p.phone AS patient_phone
       FROM appointments a JOIN patients p ON p.id = a.patient_id WHERE a.doctor_id = $1
       ORDER BY a.appointment_date DESC, a.appointment_time DESC
     `, [req.params.doctor_id])
@@ -227,6 +282,89 @@ app.get('/api/doctors/:doctor_id/appointments', async (req, res) => {
   }
 })
 
+// 10. DOKTORUN KENDİ HASTALARINI LİSTELEME
+app.get('/api/doctors/:doctor_id/patients', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT p.id, p.name, p.email, p.phone, p.tc 
+      FROM patients p
+      JOIN appointments a ON a.patient_id = p.id 
+      WHERE a.doctor_id = $1 
+      ORDER BY p.name
+    `, [req.params.doctor_id])
+    res.json(result.rows)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// 11. BAĞLAM KORUMALI CHATBOT TÜNELİ
+app.post('/api/chatbot/chat', async (req, res) => {
+  const { messages, systemPrompt } = req.body;
+
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: 'Mesaj geçmişi dizi olarak gönderilmelidir.' });
+  }
+
+  try {
+    const OLLAMA_CHAT_URL = 'http://host.docker.internal:11434/api/chat';
+    const MODEL = process.env.VITE_LLAMA_MODEL || 'llama3';
+    const ollamaMessages = [];
+    
+    if (systemPrompt) {
+      ollamaMessages.push({ role: 'system', content: systemPrompt });
+    }
+
+    messages.forEach(msg => {
+      ollamaMessages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.text
+      });
+    });
+
+    const response = await fetch(OLLAMA_CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, messages: ollamaMessages, stream: false })
+    });
+
+    if (!response.ok) throw new Error(`Ollama hatası: ${response.status}`);
+    const data = await response.json();
+    res.json({ response: data.message.content });
+
+  } catch (err) {
+    console.error('Chatbot tünel hatası:', err.message);
+    res.status(200).json({ 
+      response: "Yapay zeka bağlantısında bir gecikme yaşanıyor. Semptomlarınızı iletmek için lütfen sağ üstteki 'Symptom checker' form modülünü manuel doldurarak ilerleyiniz." 
+    });
+  }
+});
+
+// 12. SIFIRDAN HASTA KAYIT ETME (SIGN UP)
+app.post('/api/patients', async (req, res) => {
+  const { name, tc = null, email, password, phone = null } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'İsim, e-posta ve şifre alanları zorunludur.' });
+
+  try {
+    const checkEmail = await pool.query('SELECT id FROM patients WHERE email = $1', [email.trim()]);
+    if (checkEmail.rowCount > 0) return res.status(409).json({ error: 'Bu e-posta adresiyle daha önce kayıt olunmuş.' });
+
+    if (tc) {
+      const checkTc = await pool.query('SELECT id FROM patients WHERE tc = $1', [tc.trim()]);
+      if (checkTc.rowCount > 0) return res.status(409).json({ error: 'Bu TC Kimlik numarasıyla daha önce kayıt olunmuş.' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO patients (name, tc, email, password, phone, role) VALUES ($1, $2, $3, $4, $5, 'Patient') RETURNING id, name, email, role`,
+      [name.trim(), tc ? tc.trim() : null, email.trim(), password, phone ? phone.trim() : null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Kayıt işlemi sırasında veritabanı hatası oluştu.' });
+  }
+});
+
+// 404 Koruması ve Sunucu Tetikleme
 app.use((req, res) => { res.status(404).json({ error: 'Not found' }) })
 
 const start = async () => {

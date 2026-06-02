@@ -1,213 +1,113 @@
 import { useEffect, useState } from 'react'
-import Sidebar from './Sidebar.jsx'
-
-const SLOTS = [
-  { t: '09:00', booked: true  },
-  { t: '10:00', booked: true  },
-  { t: '11:00', booked: false },
-  { t: '13:00', booked: true  },
-  { t: '14:00', booked: true  },
-  { t: '15:00', booked: false },
-  { t: '16:00', booked: true  },
-  { t: '17:00', booked: false },
-  { t: '18:00', booked: false },
-]
 
 export default function DoctorDashboard({ doctor }) {
-  const [activeSection, setActiveSection] = useState('dashboard')
   const [appointments, setAppointments] = useState([])
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  const API_URL = 'http://localhost:4000'
 
   useEffect(() => {
     if (!doctor?.id) return
 
-    const loadData = async () => {
-      setLoading(true)
-      setError('')
-
+    const loadDoctorData = async () => {
       try {
-        // Fetch doctor's patients
-        const patientsRes = await fetch(`${API_URL}/api/doctors/${doctor.id}/patients`)
-        if (!patientsRes.ok) throw new Error('Unable to load patients')
-        const patientsData = await patientsRes.json()
-        setPatients(patientsData)
+        setLoading(true)
+        setError('')
 
-        // Fetch doctor's appointments
+        // 1. Doktorun kendi randevularını çek
         const apptsRes = await fetch(`${API_URL}/api/doctors/${doctor.id}/appointments`)
-        if (!apptsRes.ok) throw new Error('Unable to load appointments')
+        if (!apptsRes.ok) throw new Error('Randevular çekilemedi.')
         const apptsData = await apptsRes.json()
-        setAppointments(apptsData)
+        
+        // Bugün ve sonrasını filtrelerken saat kilit uyuşmazlığı giderildi
+        const today = new Date()
+        today.setHours(0,0,0,0)
+        const activeAppts = apptsData.filter(a => {
+          const d = new Date(a.date)
+          d.setHours(0,0,0,0)
+          return d >= today
+        })
+        setAppointments(activeAppts)
+
+        // 2. Doktorun tekil hasta geçmişini çek
+        const patientsRes = await fetch(`${API_URL}/api/doctors/${doctor.id}/patients`)
+        if (!patientsRes.ok) throw new Error('Hasta listesi çekilemedi.')
+        const patData = await patientsRes.json()
+        setPatients(patData)
+
       } catch (err) {
         console.error(err)
-        setError(err.message || 'Unable to load data')
+        setError('Doktor paneli verileri yüklenirken veritabanı hatası oluştu.')
       } finally {
         setLoading(false)
       }
     }
 
-    loadData()
-  }, [doctor?.id, API_URL])
-
-  const appointmentCount = appointments.length
-  const pendingCount = appointments.filter(a => a.status === 'Pending').length
-  const confirmedCount = appointments.filter(a => a.status === 'Confirmed').length
-  const nextAppointment = appointments.length > 0 ? appointments[0] : null
+    loadDoctorData()
+  }, [doctor])
 
   return (
-    <div className="two-col-layout">
-      <Sidebar
-        navItems={[
-          { icon: 'ti-layout-dashboard', label: 'Dashboard',   active: activeSection === 'dashboard', onClick: () => setActiveSection('dashboard') },
-          { icon: 'ti-clock',            label: 'Availability', active: activeSection === 'availability', onClick: () => setActiveSection('availability') },
-          { icon: 'ti-calendar',         label: 'Appointments', active: activeSection === 'appointments', onClick: () => setActiveSection('appointments') },
-          { icon: 'ti-notes-medical',    label: 'Patient notes', active: activeSection === 'notes', onClick: () => setActiveSection('notes') },
-        ]}
-        user={{
-          initials: doctor?.initials || 'DR',
-          name: doctor?.name || 'Doctor',
-          role: doctor?.specialty || 'Healthcare Provider',
-        }}
-      />
+    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%', background: '#f4f7f6' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2>Hoş Geldiniz, {doctor.name}</h2>
+        <p className="text-sm text-muted">{doctor.specialty} • {doctor.clinic}</p>
+      </div>
 
-      <div className="main-area">
-        {error && (
-          <div className="alert alert-error" style={{ marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
+      {error && <div className="alert alert-error">{error}</div>}
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 500 }}>
-              Good morning, Dr. {doctor?.name?.split(' ').pop()}
-            </div>
-            <div className="text-sm text-muted">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-          </div>
-          <button className="btn-primary btn btn-sm">
-            <i className="ti ti-plus" aria-hidden="true" /> Add slot
-          </button>
-        </div>
-
-        {/* Metrics */}
-        <div className="metrics-grid">
-          {[
-            { label: "Today's appointments", val: appointmentCount.toString(), sub: `${confirmedCount} confirmed`, subClass: 'up' },
-            { label: 'Pending confirmation', val: pendingCount.toString(), sub: pendingCount === 0 ? 'All set' : 'Require action', subClass: '' },
-            { label: 'Total patients', val: patients.length.toString(), sub: 'In your care', subClass: '' },
-            { label: 'AI match rate', val: '94%', sub: 'Specialty accuracy', subClass: 'up' },
-          ].map((m, i) => (
-            <div key={i} className="metric-card">
-              <div className="metric-label">{m.label}</div>
-              <div className="metric-val">{m.val}</div>
-              <div className={`metric-sub ${m.subClass}`}>{m.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Main two-col */}
-        <div className="dash-two-col">
-          {/* Schedule */}
-          <div className="card">
-            <div className="card-header">
-              Your appointments
-              {appointments.length > 5 && <span className="card-header-action">View all</span>}
-            </div>
-            {loading ? (
-              <div style={{ padding: '16px', color: 'var(--text-3)', fontSize: 13 }}>Loading appointments...</div>
-            ) : appointments.length === 0 ? (
-              <div style={{ padding: '16px', color: 'var(--text-3)', fontSize: 13 }}>No appointments scheduled.</div>
-            ) : (
-              appointments.slice(0, 5).map((a, i) => (
-                <div key={i} className="appt-row">
-                  <span className="text-xs" style={{ color: 'var(--text-3)', minWidth: 38 }}>
-                    {a.time}
-                  </span>
-                  <div className={`appt-dot ${a.status === 'Confirmed' ? 'teal' : a.status === 'Pending' ? 'amber' : 'gray'}`} />
-                  <span className="flex-1 font-medium" style={{ fontSize: 13 }}>{a.patient}</span>
-                  <span className="tag">{a.type}</span>
-                  <span className={`badge ${a.status === 'Confirmed' ? 'badge-green' : a.status === 'Pending' ? 'badge-amber' : 'badge-blue'}`}>
-                    {a.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Right col */}
-          <div className="flex-col gap-3">
-            {/* Availability */}
-            <div className="card">
-              <div className="card-header" style={{ fontSize: 13 }}>
-                Slots – today
-              </div>
-              <div className="slot-grid">
-                {SLOTS.map((s, i) => (
-                  <div key={i} className={`slot${s.booked ? ' booked' : ''}`}>{s.t}</div>
-                ))}
-              </div>
-            </div>
-
-            {/* Patient preview */}
-            {nextAppointment && (
-              <div className="card">
-                <div className="card-header" style={{ fontSize: 13 }}>
-                  Next: {nextAppointment.patient}
-                  <span className="card-header-action">{nextAppointment.time}</span>
-                </div>
-                <div className="p-3">
-                  <div className="section-label">Appointment Details</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-                    <div><strong>Patient:</strong> {nextAppointment.patient}</div>
-                    <div><strong>Type:</strong> {nextAppointment.type}</div>
-                    <div><strong>Date:</strong> {nextAppointment.date}</div>
-                    <div><strong>Time:</strong> {nextAppointment.time}</div>
-                    {nextAppointment.note && (
-                      <div style={{
-                        marginTop: 10,
-                        padding: '8px 10px',
-                        background: 'var(--teal-light)',
-                        borderRadius: 'var(--r-md)',
-                        color: 'var(--teal-dark)',
-                      }}>
-                        <strong>Note:</strong> {nextAppointment.note}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Patients list */}
-            <div className="card">
-              <div className="card-header" style={{ fontSize: 13 }}>
-                Your patients ({patients.length})
-              </div>
-              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                {loading ? (
-                  <div style={{ padding: '16px', color: 'var(--text-3)', fontSize: 13 }}>Loading...</div>
-                ) : patients.length === 0 ? (
-                  <div style={{ padding: '16px', color: 'var(--text-3)', fontSize: 13 }}>No patients yet.</div>
-                ) : (
-                  patients.slice(0, 10).map((p, i) => (
-                    <div key={i} style={{
-                      padding: '10px 12px',
-                      borderBottom: i < Math.min(patients.length, 10) - 1 ? '0.5px solid var(--border)' : 'none',
-                      fontSize: 13,
-                    }}>
-                      <div style={{ fontWeight: 500 }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{p.email}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginTop: 20 }}>
+        
+        {/* Sol Sütun: Güncel Randevu Akışı */}
+        <div>
+          <div className="card" style={{ padding: 20, background: 'white', borderRadius: 8 }}>
+            <h4>Yaklaşan Randevularınız ({appointments.length})</h4>
+            <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+              {loading ? (
+                <div>Yükleniyor...</div>
+              ) : appointments.length === 0 ? (
+                <div className="text-muted text-sm">Bugün için planlanmış bir randevunuz bulunmamaktadır.</div>
+              ) : (
+                appointments.map(appt => (
+                  <div key={appt.id} style={{ padding: '12px 0', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>{appt.patient}</span>
+                      <div style={{ fontSize: 12, color: '#667781' }}>{appt.patient_email}</div>
+                      {appt.note && <div style={{ fontSize: 11, color: '#854F0B', marginTop: 4 }}><strong>Hasta Notu:</strong> {appt.note}</div>}
                     </div>
-                  ))
-                )}
-              </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 600, color: '#008069', fontSize: 13 }}>{appt.date} - {appt.time}</span>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Tip: {appt.type}</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
+
+        {/* Sağ Sütun: Kayıtlı Hastalar Rehberi */}
+        <div>
+          <div className="card" style={{ padding: 20, background: 'white', borderRadius: 8 }}>
+            <h4>Kayıtlı Hastalarım ({patients.length})</h4>
+            <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+              {loading ? (
+                <div>Yükleniyor...</div>
+              ) : patients.length === 0 ? (
+                <div className="text-muted text-sm">Henüz sistemde kayıtlı hastanız bulunmuyor.</div>
+              ) : (
+                patients.map(p => (
+                  <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid #f4f7f6' }}>
+                    <div style={{ fontWeight: 500, fontSize: 13 }}>{p.name}</div>
+                    <div style={{ fontSize: 11, color: '#667781' }}>{p.email}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   )

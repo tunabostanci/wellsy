@@ -592,3 +592,223 @@ input, select { font-family: var(--font); }
   padding: 8px 12px; border-radius: var(--r-md);
   margin-bottom: 16px; line-height: 1.4;
 }
+/* WhatsApp Chat Düzeni Ana Kapsayıcı */
+.wa-chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px); /* Ekran yüksekliğine sabitlenerek taşma engellendi */
+  max-width: 700px;
+  margin: 10px auto;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  background-color: #efeae2; /* Orijinal WhatsApp Arka Planı */
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* WhatsApp Üst Başlık Çubuğu */
+.wa-header {
+  background-color: #008069; /* WhatsApp Yeşili */
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+
+.wa-avatar {
+  width: 40px;
+  height: 40px;
+  background-color: #00a884;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.wa-header-info {
+  flex: 1;
+}
+
+.wa-header-info h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.wa-header-info span {
+  font-size: 11px;
+  color: #e9edef;
+  display: block;
+}
+
+.wa-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wa-header-actions .btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: none;
+}
+
+.wa-header-actions .btn.active {
+  background: white !important;
+  color: #008069 !important;
+}
+
+/* CRITICAL: Mesaj Penceresi ve Kaydırma (Scroll) Alanı */
+.wa-chat-window {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto; /* İçerik taşınca sadece bu alan kaydırılabilir */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Form Konumlandırıcı */
+.wa-form-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+/* Mesaj Satırları ve Balonları */
+.wa-message-row {
+  display: flex;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+/* Giden Mesajlar (Hasta - Sağ Taraf) */
+.wa-sent {
+  justify-content: flex-end;
+}
+
+.wa-sent .wa-bubble {
+  background-color: #d9fdd3; /* WhatsApp Açık Yeşil */
+  color: #111b21;
+  border-radius: 8px 0px 8px 8px; /* Sağ üst köşe WhatsApp kuyruğu efekti */
+}
+
+/* Gelen Mesajlar (Chatbot - Sol Taraf) */
+.wa-received {
+  justify-content: flex-start;
+}
+
+.wa-received .wa-bubble {
+  background-color: #ffffff; /* WhatsApp Beyaz */
+  color: #111b21;
+  border-radius: 0px 8px 8px 8px; /* Sol üst köşe kuyruk efekti */
+}
+
+/* Ortak Balon Stili */
+.wa-bubble {
+  max-width: 70%;
+  padding: 8px 12px 18px 12px;
+  position: relative;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  font-size: 14px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.wa-bubble p {
+  margin: 0;
+}
+
+/* Sağ Alt Köşedeki Saat Alanı */
+.wa-time {
+  position: absolute;
+  bottom: 2px;
+  right: 7px;
+  font-size: 10px;
+  color: #667781;
+}
+
+/* Alt Giriş Çubuğu */
+.wa-footer {
+  background-color: #f0f2f5;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wa-footer input {
+  flex: 1;
+  background-color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.wa-footer button {
+  background-color: #008069;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.wa-footer button:hover {
+  background-color: #006653;
+}
+
+/* Üç Nokta Yazıyor Animasyonu */
+.wa-loading-bubble {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px !important;
+}
+
+.wa-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #667781;
+  border-radius: 50%;
+  animation: waBounce 1.4s infinite ease-in-out both;
+}
+
+.wa-dot:nth-child(1) { animation-delay: -0.32s; }
+.wa-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes waBounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Acil Durum Ekran Kilidi */
+.emergency-fullscreen-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(211, 47, 47, 0.96);
+  color: white; z-index: 1000;
+  display: flex; justify-content: center; align-items: center;
+  padding: 24px;
+}
+
+.emergency-box {
+  background: white; color: #111;
+  padding: 24px; border-radius: 12px;
+  text-align: center; max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.emergency-box h2 { color: #d32f2f; font-size: 20px; margin-bottom: 12px; }
+.wa-btn-call { background: #d32f2f; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; }
+.wa-btn-close { background: #667781; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
