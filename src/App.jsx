@@ -12,12 +12,9 @@ export default function App() {
   const [active, setActive] = useState('chatbot')
   const [staffDefaultView, setStaffDefaultView] = useState('dashboard')
 
-  const handleDoctorLogin = (doctor) => {
-    setUser({ role: 'doctor', ...doctor })
-  }
-
-  const handlePatientLogin = (patient) => {
-    setUser({ role: 'patient', ...patient })
+  // Backend'den gelen kullanıcı verisini ve rolünü olduğu gibi saklar
+  const handleLoginSuccess = (userData) => {
+    setUser(userData)
   }
 
   const handleLogout = () => {
@@ -26,30 +23,21 @@ export default function App() {
     setStaffDefaultView('dashboard')
   }
 
-  // Show login page if no user is logged in
+  // Kullanıcı giriş yapmadıysa ortak Login ekranını gösterir
   if (!user) {
-    return <Login onDoctorLogin={handleDoctorLogin} onPatientLogin={handlePatientLogin} />
+    return <Login onLoginSuccess={handleLoginSuccess} />
   }
 
-  // Doctor dashboard - isolated view for doctors only
+  // DOCTOR MODÜLÜ - Sadece Doktor Rolü Görebilir
   if (user.role === 'doctor') {
     return (
       <div className="app-shell">
         <nav className="tab-bar" role="tablist" aria-label="Doctor views">
-          <button
-            role="tab"
-            className="tab-btn active"
-            style={{ flex: 1, opacity: 1 }}
-          >
+          <button role="tab" className="tab-btn active" style={{ flex: 1, opacity: 1 }}>
             <i className="ti ti-layout-dashboard" aria-hidden="true" />
             Doctor Dashboard
           </button>
-          <button
-            role="tab"
-            className="tab-btn"
-            onClick={handleLogout}
-            style={{ flex: 1 }}
-          >
+          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>
             <i className="ti ti-logout" aria-hidden="true" />
             Logout
           </button>
@@ -61,8 +49,8 @@ export default function App() {
     )
   }
 
-  // Patient journey - isolated view for patients only
-  if (user.role === 'patient') {
+  // PATIENT MODÜLÜ - Sadece Normal Hastalar Görebilir
+  if (user.role === 'Patient' || user.role === 'patient') {
     const PATIENT_TABS = [
       { id: 'chatbot', label: 'Chatbot', icon: 'ti-message-chatbot' },
       { id: 'doctors', label: 'Choose Doctor', icon: 'ti-stethoscope' },
@@ -84,12 +72,7 @@ export default function App() {
               {t.label}
             </button>
           ))}
-          <button
-            role="tab"
-            className="tab-btn"
-            onClick={handleLogout}
-            style={{ marginLeft: 'auto' }}
-          >
+          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ marginLeft: 'auto' }}>
             <i className="ti ti-logout" aria-hidden="true" />
             Logout
           </button>
@@ -118,8 +101,8 @@ export default function App() {
     )
   }
 
-  // Staff panel - existing multi-tab view
-  if (user.role === 'staff') {
+  // STAFF MODÜLÜ - Klinik Personeli (Mert gibi kullanıcılar) Buraya Düşer
+  if (user.role === 'Staff' || user.role === 'staff') {
     const STAFF_TABS = [
       { id: 'staff', label: 'Clinic Staff', icon: 'ti-users' },
       { id: 'admin', label: 'Admin Panel', icon: 'ti-shield-check' },
@@ -143,12 +126,7 @@ export default function App() {
               {t.label}
             </button>
           ))}
-          <button
-            role="tab"
-            className="tab-btn"
-            onClick={handleLogout}
-            style={{ marginLeft: 'auto' }}
-          >
+          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ marginLeft: 'auto' }}>
             <i className="ti ti-logout" aria-hidden="true" />
             Logout
           </button>
@@ -162,25 +140,16 @@ export default function App() {
     )
   }
 
-  // Admin-only view
-  if (user.role === 'admin') {
+  // ADMIN MODÜLÜ - Sistem Yöneticileri Buraya Düşer
+  if (user.role === 'Admin' || user.role === 'admin') {
     return (
       <div className="app-shell">
         <nav className="tab-bar" role="tablist" aria-label="Admin views">
-          <button
-            role="tab"
-            className="tab-btn active"
-            style={{ flex: 1, opacity: 1 }}
-          >
+          <button role="tab" className="tab-btn active" style={{ flex: 1, opacity: 1 }}>
             <i className="ti ti-shield-check" aria-hidden="true" />
             Admin Panel
           </button>
-          <button
-            role="tab"
-            className="tab-btn"
-            onClick={handleLogout}
-            style={{ flex: 1 }}
-          >
+          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>
             <i className="ti ti-logout" aria-hidden="true" />
             Logout
           </button>
@@ -194,4 +163,3 @@ export default function App() {
 
   return null
 }
-

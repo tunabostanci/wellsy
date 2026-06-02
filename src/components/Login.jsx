@@ -1,17 +1,23 @@
 import { useState } from 'react'
 
-export default function Login({ onDoctorLogin = () => {}, onPatientLogin = () => {} }) {
-  const [mode, setMode] = useState('role') // 'role' | 'doctor-login' | 'patient-login'
-  const [doctorEmail, setDoctorEmail] = useState('')
-  const [patientEmail, setPatientEmail] = useState('')
+export default function Login({ onLoginSuccess }) {
+  const [mode, setMode] = useState('role') // 'role' | 'login-form'
+  const [selectedRole, setSelectedRole] = useState('') // 'patient' | 'doctor' | 'staff' | 'admin'
+  const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  const API_URL =  'http://localhost:4000'
 
-  const handleDoctorLogin = async () => {
-    if (!doctorEmail.trim()) {
-      setError('Please enter your email address')
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role)
+    setMode('login-form')
+    setError('')
+  }
+
+  const handleLogin = async () => {
+    if (!email.trim()) {
+      setError('Lütfen e-posta adresinizi giriniz.')
       return
     }
 
@@ -19,384 +25,94 @@ export default function Login({ onDoctorLogin = () => {}, onPatientLogin = () =>
     setError('')
 
     try {
-      const response = await fetch(`${API_URL}/api/doctor-login`, {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: doctorEmail }),
+        body: JSON.stringify({ email: email.trim(), role: selectedRole }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Doctor not found')
+        throw new Error(data.error || 'Giriş bilgileri hatalı.')
       }
 
-      // Pass doctor info to parent
-      onDoctorLogin(data.doctor)
+      // Başarılı giriş verisini saf haliyle App.jsx'e uçurur
+      onLoginSuccess(data.user)
     } catch (err) {
       console.error(err)
-      setError(err.message || 'Unable to log in. Please try again.')
+      setError(err.message || 'Sunucu bağlantı hatası oluştu.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handlePatientLogin = async () => {
-    if (!patientEmail.trim()) {
-      setError('Please enter your email address')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await fetch(`${API_URL}/api/patient-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: patientEmail }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Patient not found')
-      }
-
-      // Pass patient info to parent
-      onPatientLogin(data.patient)
-    } catch (err) {
-      console.error(err)
-      setError(err.message || 'Unable to log in. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (mode === 'role') {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%)',
-        padding: '20px',
-      }}>
-        <div style={{
-          background: '#fff',
-          borderRadius: 'var(--r-lg)',
-          padding: '40px',
-          maxWidth: '420px',
-          width: '100%',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-        }}>
-          <div style={{ marginBottom: 32, textAlign: 'center' }}>
-            <div style={{
-              fontSize: 28,
-              fontWeight: 700,
-              color: 'var(--text-1)',
-              marginBottom: 8,
-            }}>
-              Wellsy
-            </div>
-            <div style={{
-              fontSize: 14,
-              color: 'var(--text-3)',
-              lineHeight: 1.5,
-            }}>
-              Intelligent Healthcare Appointment System
-            </div>
-          </div>
-
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-          }}>
-            <button
-              type="button"
-              className="btn-primary btn"
-              style={{
-                height: 48,
-                fontSize: 16,
-                fontWeight: 500,
-              }}
-              onClick={() => {
-                setMode('patient-login')
-                setError('')
-                setPatientEmail('')
-              }}
-            >
-              <i className="ti ti-user" style={{ marginRight: 8 }} />
-              Login as Patient
-            </button>
-
-            <button
-              type="button"
-              className="btn"
-              style={{
-                height: 48,
-                fontSize: 16,
-                fontWeight: 500,
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-md)',
-              }}
-              onClick={() => {
-                setMode('doctor-login')
-                setError('')
-                setDoctorEmail('')
-              }}
-            >
-              <i className="ti ti-stethoscope" style={{ marginRight: 8 }} />
-              Login as Doctor
-            </button>
-
-            <button
-              type="button"
-              className="btn"
-              style={{
-                height: 48,
-                fontSize: 16,
-                fontWeight: 500,
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-md)',
-              }}
-            >
-              <i className="ti ti-shield-check" style={{ marginRight: 8 }} />
-              Admin Panel
-            </button>
-
-            <button
-              type="button"
-              className="btn"
-              style={{
-                height: 48,
-                fontSize: 16,
-                fontWeight: 500,
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-md)',
-              }}
-            >
-              <i className="ti ti-users" style={{ marginRight: 8 }} />
-              Clinic Staff
-            </button>
-          </div>
-
-          <div style={{
-            marginTop: 24,
-            padding: '16px',
-            background: 'var(--bg-surface)',
-            borderRadius: 'var(--r-md)',
-            fontSize: 12,
-            color: 'var(--text-3)',
-            lineHeight: 1.6,
-          }}>
-            <strong>Demo Credentials:</strong>
-            <div style={{ marginTop: 8, fontFamily: 'monospace', fontSize: 11 }}>
-              Patient: elif.k@example.com
-              <br />
-              Doctor: ayse.kaya@wellsy.com
-            </div>
-          </div>
+  return (
+    <div className="login-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f4f7f6' }}>
+      <div className="card" style={{ width: 400, padding: 32, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--teal-dark)' }}>Wellsy</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Null Pointers Akıllı Sağlık Sistemi</p>
         </div>
-      </div>
-    )
-  }
 
-  if (mode === 'patient-login') {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%)',
-        padding: '20px',
-      }}>
-        <div style={{
-          background: '#fff',
-          borderRadius: 'var(--r-lg)',
-          padding: '40px',
-          maxWidth: '420px',
-          width: '100%',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-        }}>
-          <div style={{ marginBottom: 24 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('role')
-                setError('')
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--teal)',
-                fontSize: 14,
-                cursor: 'pointer',
-                marginBottom: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <i className="ti ti-arrow-left" />
-              Back
-            </button>
-
-            <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>
-              Patient Login
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--text-3)' }}>
-              Enter your email to access your appointments
-            </div>
+        {error && (
+          <div className="alert alert-error" style={{ marginBottom: 16, padding: 12, fontSize: 13 }}>
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div style={{
-              marginBottom: 16,
-              padding: '12px 14px',
-              background: '#FFE6E6',
-              border: '1px solid #FFA8A8',
-              borderRadius: 'var(--r-md)',
-              color: '#C30000',
-              fontSize: 13,
-            }}>
-              {error}
-            </div>
-          )}
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
-              Email Address
+        {mode === 'role' ? (
+          <div>
+            <label style={{ fontSize: 14, fontWeight: 500, display: 'block', marginBottom: 12, textAlign: 'center' }}>
+              Giriş Yapacağınız Rolü Seçiniz:
             </label>
-            <input
-              type="email"
-              className="text-input"
-              style={{ width: '100%', fontSize: 14 }}
-              placeholder="your@email.com"
-              value={patientEmail}
-              onChange={e => setPatientEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handlePatientLogin()}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button type="button" className="btn" onClick={() => handleRoleSelect('patient')}>
+                <i className="ti ti-user" /> Hasta Girişi
+              </button>
+              <button type="button" className="btn" onClick={() => handleRoleSelect('doctor')}>
+                <i className="ti ti-stethoscope" /> Doktor Girişi
+              </button>
+              <button type="button" className="btn" onClick={() => handleRoleSelect('staff')}>
+                <i className="ti ti-users" /> Klinik Personeli (Staff) Girişi
+              </button>
+              <button type="button" className="btn" onClick={() => handleRoleSelect('admin')}>
+                <i className="ti ti-shield-check" /> Sistem Yöneticisi (Admin) Girişi
+              </button>
+            </div>
           </div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <span className="badge badge-teal" style={{ marginBottom: 12, textTransform: 'uppercase' }}>
+                {selectedRole} Giriş Alanı
+              </span>
+              <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
+                E-posta Adresi
+              </label>
+              <input
+                type="email"
+                className="text-input"
+                style={{ width: '100%', fontSize: 14 }}
+                placeholder={`${selectedRole}@wellsy.com`}
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                disabled={loading}
+              />
+            </div>
 
-          <button
-            type="button"
-            className="btn-primary btn"
-            style={{
-              width: '100%',
-              height: 44,
-              fontSize: 14,
-              fontWeight: 500,
-            }}
-            onClick={handlePatientLogin}
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setMode('role')} disabled={loading}>
+                Geri
+              </button>
+              <button type="button" className="btn-primary btn" style={{ flex: 2 }} onClick={handleLogin} disabled={loading}>
+                {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    )
-  }
-
-  if (mode === 'doctor-login') {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%)',
-        padding: '20px',
-      }}>
-        <div style={{
-          background: '#fff',
-          borderRadius: 'var(--r-lg)',
-          padding: '40px',
-          maxWidth: '420px',
-          width: '100%',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-        }}>
-          <div style={{ marginBottom: 24 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('role')
-                setError('')
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--teal)',
-                fontSize: 14,
-                cursor: 'pointer',
-                marginBottom: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <i className="ti ti-arrow-left" />
-              Back
-            </button>
-
-            <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>
-              Doctor Login
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--text-3)' }}>
-              Enter your email to access your dashboard
-            </div>
-          </div>
-
-          {error && (
-            <div style={{
-              marginBottom: 16,
-              padding: '12px 14px',
-              background: '#FFE6E6',
-              border: '1px solid #FFA8A8',
-              borderRadius: 'var(--r-md)',
-              color: '#C30000',
-              fontSize: 13,
-            }}>
-              {error}
-            </div>
-          )}
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 6 }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              className="text-input"
-              style={{ width: '100%', fontSize: 14 }}
-              placeholder="your@wellsy.com"
-              value={doctorEmail}
-              onChange={e => setDoctorEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleDoctorLogin()}
-            />
-          </div>
-
-          <button
-            type="button"
-            className="btn-primary btn"
-            style={{
-              width: '100%',
-              height: 44,
-              fontSize: 14,
-              fontWeight: 500,
-            }}
-            onClick={handleDoctorLogin}
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return null
+    </div>
+  )
 }
