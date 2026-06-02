@@ -10,6 +10,8 @@ const SYMPTOM_QUESTIONS = [
 
 const CRITICAL_SYMPTOMS = ['göğüs ağrısı', 'chest pain', 'nefes darlığı', 'şiddetli kanama', 'intihar', 'suicide', 'kalp krizi']
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
 export default function PatientChatbot({ onNavigateToDoctors = () => {} }) {
   const [mode, setMode] = useState('chat')
   const [messages, setMessages] = useState([
@@ -63,7 +65,7 @@ export default function PatientChatbot({ onNavigateToDoctors = () => {} }) {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:4000/api/chatbot/chat', {
+      const response = await fetch(`${API_URL}/api/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMessages }),
@@ -138,7 +140,7 @@ export default function PatientChatbot({ onNavigateToDoctors = () => {} }) {
     const pseudoMessages = [{ role: 'user', text: `Patient symptoms:\n${symptomLines}` }]
 
     try {
-      const response = await fetch('http://localhost:4000/api/chatbot/chat', {
+      const response = await fetch(`${API_URL}/api/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: pseudoMessages, systemPrompt }),

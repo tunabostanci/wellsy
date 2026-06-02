@@ -10,7 +10,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  const API_URL = 'http://localhost:4000'
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
   const handleConfirmBooking = async () => {
     if (!selectedSlot) {
@@ -54,12 +54,12 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
 
   if (success) {
     return (
-      <div style={{ padding: '40px 20px', textAlign: 'center', maxWidth: 450, margin: '50px auto', background: 'white', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderTop: '6px solid #008069' }}>
-        <div style={{ width: 64, height: 64, background: '#e1f5ee', borderRadius: '50%', display: 'flex', alignItems: 'center', justifycontent: 'center', margin: '0 auto 16px auto' }}>
-          <i className="ti ti-check" style={{ fontSize: 32, color: '#008069' }} />
+      <div style={{ padding: '40px 20px', textAlign: 'center', maxWidth: 450, margin: '50px auto', background: 'white', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderTop: '6px solid var(--teal)' }}>
+        <div style={{ width: 64, height: 64, background: 'var(--teal-light)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+          <i className="ti ti-check" style={{ fontSize: 32, color: 'var(--teal)' }} />
         </div>
-        <h3 style={{ color: '#111b21', fontSize: 20, fontWeight: 600 }}>Randevunuz Alındı!</h3>
-        <p style={{ fontSize: 14, color: '#667781', marginTop: 8, lineHeight: 1.5 }}>
+        <h3 style={{ color: 'var(--text-1)', fontSize: 20, fontWeight: 600 }}>Randevunuz Alındı!</h3>
+        <p style={{ fontSize: 14, color: 'var(--text-2)', marginTop: 8, lineHeight: 1.5 }}>
           {doctor.name} ile olan randevunuz başarıyla sisteme işlendi. Randevularım sayfasına aktarılıyorsunuz...
         </p>
       </div>
@@ -67,17 +67,17 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
   }
 
   return (
-    <div className="screen-content" style={{ padding: '28px 24px', overflowY: 'auto', height: '100%', background: '#f4f7f6' }}>
+    <div className="page" style={{ padding: '28px 24px', overflowY: 'auto', height: '100%', background: 'var(--bg-page)' }}>
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
         
         {/* Doktor Mini Kart Alanı */}
         <div className="card" style={{ padding: 20, background: 'white', borderRadius: 12, display: 'flex', gap: 16, alignItems: 'center', marginBottom: 20, border: '1px solid var(--border)' }}>
-          <div style={{ width: 52, height: 52, borderRadius: '50%', background: doctor?.avatarBg || '#E1F5EE', color: doctor?.avatarColor || '#0F6E56', display: 'flex', alignItems: 'center', justifycontent: 'center', fontWeight: 'bold', fontSize: 18 }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: doctor?.avatarBg || 'var(--teal-light)', color: doctor?.avatarColor || 'var(--teal-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 18 }}>
             {doctor?.initials || 'DR'}
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#111b21' }}>{doctor?.name}</h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#667781' }}>{doctor?.specialty} • {doctor?.clinic}</p>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--text-1)' }}>{doctor?.name}</h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-2)' }}>{doctor?.specialty} • {doctor?.clinic}</p>
           </div>
         </div>
 
@@ -87,7 +87,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
         <div className="card" style={{ padding: 24, background: 'white', borderRadius: 12, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 20 }}>
           
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#111b21', display: 'block', marginBottom: 8 }}>Randevu Tarihi</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', display: 'block', marginBottom: 8 }}>Randevu Tarihi</label>
             <input 
               type="date" className="text-input" value={appointmentDate} 
               onChange={e => setAppointmentDate(e.target.value)} 
@@ -97,7 +97,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
           </div>
 
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#111b21', display: 'block', marginBottom: 12 }}>Müsait Saatler</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', display: 'block', marginBottom: 12 }}>Müsait Saatler</label>
             
             {/* Şık ve Kompakt Grid Yapısı */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
@@ -110,13 +110,13 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
                       height: '42px',
                       borderRadius: '20px', // Oval modern görünüm
                       fontSize: '13px',
-                      fontWeight: isSelected ? '6px' : '4px',
+                      fontWeight: isSelected ? 600 : 400,
                       cursor: 'pointer',
-                      border: isSelected ? 'none' : '1px solid #e9edef',
-                      background: isSelected ? '#008069' : '#ffffff', // Seçilince WhatsApp Yeşili
-                      color: isSelected ? '#ffffff' : '#111b21',
+                      border: isSelected ? 'none' : '1px solid var(--border)',
+                      background: isSelected ? 'var(--teal)' : 'var(--bg-card)', // Seçilince marka yeşili
+                      color: isSelected ? 'var(--bg-card)' : 'var(--text-1)',
                       transition: 'all 0.15s ease-in-out',
-                      boxShadow: isSelected ? '0 4px 10px rgba(0,128,105,0.2)' : 'none'
+                      boxShadow: isSelected ? '0 4px 10px rgba(29,158,117,0.25)' : 'none'
                     }}
                     onClick={() => setSelectedSlot(slot)}
                     disabled={loading}
@@ -129,7 +129,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
           </div>
 
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#111b21', display: 'block', marginBottom: 8 }}>Doktora İletmek İstediğiniz Not</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', display: 'block', marginBottom: 8 }}>Doktora İletmek İstediğiniz Not</label>
             <textarea
               className="text-input" placeholder="Belirtileriniz hakkında eklemek istediğiniz bir detay var mı?"
               value={note} onChange={e => setNote(e.target.value)}
@@ -141,11 +141,11 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
         </div>
 
         {/* Aksiyon Butonları Çubuğu */}
-        <div style={{ display: 'flex', gap: 12, justifycontent: 'flex-end', marginTop: 20 }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 20 }}>
           <button type="button" className="btn" onClick={onBack} style={{ height: 42, padding: '0 20px', borderRadius: 21 }} disabled={loading}>Geri Dön</button>
           <button 
             type="button" className="btn-primary btn" onClick={handleConfirmBooking} 
-            style={{ height: 42, padding: '0 28px', borderRadius: 21, background: '#008069', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ height: 42, padding: '0 28px', borderRadius: 21, background: 'var(--teal)', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
             disabled={loading || !selectedSlot}
           >
             {loading ? 'Onaylanıyor...' : 'Randevuyu Onayla'} <i className="ti ti-chevron-right" />

@@ -6,7 +6,7 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const API_URL = 'http://localhost:4000'
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
   useEffect(() => {
     const loadDoctors = async () => {
@@ -25,7 +25,7 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
   }, [])
 
   return (
-    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
+    <div className="page" style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
       <h2>Available Doctors</h2>
       <p className="text-sm text-muted mb-4">Select a doctor to continue with your appointment booking.</p>
 
@@ -45,7 +45,7 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
             onClick={() => setSelectedIdx(i)}
           >
             <div className="flex gap-3 items-center">
-              <div className="avatar" style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: doc.avatarBg || '#E1F5EE', color: doc.avatarColor || '#0F6E56', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+              <div className="avatar" style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: doc.avatarBg || 'var(--teal-light)', color: doc.avatarColor || 'var(--teal-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                 {doc.initials || 'DR'}
               </div>
               <div>
@@ -53,7 +53,7 @@ export default function DoctorListing({ onBack = () => {}, onContinue = () => {}
                 <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{doc.specialty} • <span className="text-muted">{doc.clinic}</span></div>
                 <div className="flex gap-1 flex-wrap" style={{ marginTop: 6 }}>
                   {(doc.tags || []).map((tag, idx) => (
-                    <span key={idx} className="tag" style={{ fontSize: 11, padding: '2px 8px', background: '#f0f2f5', borderRadius: '4px' }}>{tag}</span>
+                    <span key={idx} className="tag" style={{ fontSize: 11, padding: '2px 8px', background: 'var(--bg-surface)', borderRadius: '4px' }}>{tag}</span>
                   ))}
                 </div>
               </div>

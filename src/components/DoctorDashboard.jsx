@@ -6,7 +6,7 @@ export default function DoctorDashboard({ doctor }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const API_URL = 'http://localhost:4000'
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
   useEffect(() => {
     if (!doctor?.id) return
@@ -49,7 +49,7 @@ export default function DoctorDashboard({ doctor }) {
   }, [doctor])
 
   return (
-    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%', background: '#f4f7f6' }}>
+    <div className="page" style={{ padding: 24, overflowY: 'auto', height: '100%', background: 'var(--bg-page)' }}>
       <div style={{ marginBottom: 20 }}>
         <h2>Hoş Geldiniz, {doctor.name}</h2>
         <p className="text-sm text-muted">{doctor.specialty} • {doctor.clinic}</p>
@@ -73,11 +73,11 @@ export default function DoctorDashboard({ doctor }) {
                   <div key={appt.id} style={{ padding: '12px 0', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>{appt.patient}</span>
-                      <div style={{ fontSize: 12, color: '#667781' }}>{appt.patient_email}</div>
-                      {appt.note && <div style={{ fontSize: 11, color: '#854F0B', marginTop: 4 }}><strong>Hasta Notu:</strong> {appt.note}</div>}
+                      <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{appt.patient_email}</div>
+                      {appt.note && <div style={{ fontSize: 11, color: 'var(--amber-text)', marginTop: 4 }}><strong>Hasta Notu:</strong> {appt.note}</div>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontWeight: 600, color: '#008069', fontSize: 13 }}>{appt.date} - {appt.time}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--teal)', fontSize: 13 }}>{appt.date} - {appt.time}</span>
                       <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Tip: {appt.type}</div>
                     </div>
                   </div>
@@ -98,9 +98,9 @@ export default function DoctorDashboard({ doctor }) {
                 <div className="text-muted text-sm">Henüz sistemde kayıtlı hastanız bulunmuyor.</div>
               ) : (
                 patients.map(p => (
-                  <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid #f4f7f6' }}>
+                  <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--bg-page)' }}>
                     <div style={{ fontWeight: 500, fontSize: 13 }}>{p.name}</div>
-                    <div style={{ fontSize: 11, color: '#667781' }}>{p.email}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{p.email}</div>
                   </div>
                 ))
               )}

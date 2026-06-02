@@ -12,7 +12,6 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [active, setActive] = useState('chatbot') // 'chatbot' | 'doctors' | 'booking-grid' | 'appts'
   const [selectedDoctor, setSelectedDoctor] = useState(null) // Seçilen doktor hafızası
-  const [staffDefaultView, setStaffDefaultView] = useState('dashboard')
 
   const handleLoginSuccess = (userData) => {
     setUser(userData)
@@ -38,7 +37,7 @@ export default function App() {
     return (
       <div className="app-shell">
         <nav className="tab-bar" role="tablist">
-          <button role="tab" className="tab-btn active" style={{ flex: 1 }}>Doctor Dashboard</button>
+          <div className="tab-btn active" style={{ flex: 1, cursor: 'default' }}>Doctor Dashboard</div>
           <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>Logout</button>
         </nav>
         <div className="screen-content"><DoctorDashboard doctor={user} /></div>
@@ -98,9 +97,6 @@ export default function App() {
             <AppointmentTracking
               patient={user}
               onNewAppointment={() => setActive('doctors')}
-              onChatbot={() => setActive('chatbot')}
-              onChooseDoctor={() => setActive('doctors')}
-              onProfile={() => {}}
             />
           )}
         </div>
@@ -113,10 +109,10 @@ export default function App() {
     return (
       <div className="app-shell">
         <nav className="tab-bar" role="tablist">
-          <button role="tab" className="tab-btn active" style={{ flex: 1 }}>Clinic Staff</button>
+          <div className="tab-btn active" style={{ flex: 1, cursor: 'default' }}>Clinic Staff</div>
           <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>Logout</button>
         </nav>
-        <div className="screen-content"><StaffPanel defaultView={staffDefaultView} /></div>
+        <div className="screen-content"><StaffPanel defaultView="dashboard" /></div>
       </div>
     )
   }
@@ -126,7 +122,7 @@ export default function App() {
     return (
       <div className="app-shell">
         <nav className="tab-bar" role="tablist">
-          <button role="tab" className="tab-btn active" style={{ flex: 1 }}>Admin Panel</button>
+          <div className="tab-btn active" style={{ flex: 1, cursor: 'default' }}>Admin Panel</div>
           <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>Logout</button>
         </nav>
         <div className="screen-content"><AdminPanel /></div>

@@ -14,7 +14,7 @@ export default function Login({ onLoginSuccess }) {
   const [regEmail, setRegEmail] = useState('')
   const [regPassword, setRegPassword] = useState('')
 
-  const API_URL = 'http://localhost:4000'
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
   const handleRoleSelect = (role) => {
     setSelectedRole(role)
@@ -78,7 +78,7 @@ export default function Login({ onLoginSuccess }) {
   }
 
   return (
-    <div className="login-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f4f7f6' }}>
+    <div className="login-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'var(--bg-page)' }}>
       <div className="card" style={{ width: 400, padding: 32, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
         <h2 style={{ textAlign: 'center', color: 'var(--teal-dark)' }}>Wellsy</h2>
         
@@ -91,7 +91,7 @@ export default function Login({ onLoginSuccess }) {
             <button className="btn" onClick={() => handleRoleSelect('doctor')}>Doktor Girişi</button>
             <button className="btn" onClick={() => handleRoleSelect('staff')}>Klinik Personeli Girişi</button>
             <button className="btn" onClick={() => handleRoleSelect('admin')}>Sistem Yöneticisi Girişi</button>
-            <button className="btn-primary btn" onClick={() => setMode('register-form')}>Kayıt Ol (Sign Up)</button>
+            <button className="btn-primary btn" onClick={() => { setMode('register-form'); setError(''); setSuccess('') }}>Kayıt Ol (Sign Up)</button>
           </div>
         )}
 

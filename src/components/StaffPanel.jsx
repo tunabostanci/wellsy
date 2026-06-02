@@ -4,29 +4,6 @@ import Sidebar from './Sidebar.jsx'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 /* ── Mock data ───────────────────────────────────────────────────── */
-const CHANGE_REQUESTS = [
-  {
-    type: 'Cancellation',   typeCls: 'badge-red',
-    patient: 'Selin Aydın', doctor: 'Dr. Ayşe Kaya',
-    date: '18 Nisan 14:00',  newDate: null,    status: 'Pending', statusCls: 'badge-amber',
-  },
-  {
-    type: 'Reschedule',    typeCls: 'badge-blue',
-    patient: 'Can Özkan',  doctor: 'Dr. Mehmet Yılmaz',
-    date: '17 Nisan 11:00', newDate: '18 Nisan 10:00', status: 'Pending', statusCls: 'badge-amber',
-  },
-  {
-    type: 'Reschedule',    typeCls: 'badge-blue',
-    patient: 'Ahmet Yıldız', doctor: 'Dr. Ayşe Kaya',
-    date: '16 Nisan 09:00', newDate: '18 Nisan 10:00', status: 'Approved', statusCls: 'badge-green',
-  },
-  {
-    type: 'Cancellation',  typeCls: 'badge-red',
-    patient: 'Mehmet Arslan', doctor: 'Dr. Zeynep Demir',
-    date: '18 Nisan 12:00', newDate: null,   status: 'Cancelled', statusCls: '',
-  },
-]
-
 const APPOINTMENTS = [
   { id: '#APT-2026-8412', patient: 'Elif K.', doctor: 'Dr. Ayşe Kaya',     date: '13 May 2026', time: '14:00', type: 'Online',     status: 'Confirmed', statusCls: 'badge-green' },
   { id: '#APT-2026-8398', patient: 'Can Ö.',  doctor: 'Dr. Mehmet Yılmaz', date: '20 May 2026', time: '10:30', type: 'In-person',  status: 'Pending',   statusCls: 'badge-amber' },
@@ -47,7 +24,6 @@ const DOCTORS = [
   { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychologist' },
   { name: 'Dr. Selin Aydın', branch: 'Neurology' },
 ]
-const BRANCHES = ['Clinical Psychologist', 'Psychiatrist', 'Neurology', 'Internal Medicine']
 const SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
 
 function calculateUrgency(description) {
@@ -77,46 +53,75 @@ function calculateUrgency(description) {
 
 /* ── Sub-views ───────────────────────────────────────────────────── */
 function StaffDashboard() {
+  const [appointments, setAppointments] = useState([])
+  const [pendingRequests, setPendingRequests] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [aRes, cRes] = await Promise.all([
+          fetch(`${API_URL}/api/appointments`),
+          fetch(`${API_URL}/api/change-requests`),
+        ])
+        const appts = aRes.ok ? await aRes.json() : []
+        const reqs = cRes.ok ? await cRes.json() : []
+        setAppointments(appts)
+        setPendingRequests(reqs.filter(r => r.status === 'Pending').length)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const pending = appointments.filter(a => a.status === 'Pending').length
+  const metrics = [
+    { label: 'Toplam Randevu',    val: appointments.length, icon: 'ti-users',         color: 'var(--teal)' },
+    { label: 'Bekleyen Randevu',  val: pending,             icon: 'ti-clock',         color: 'var(--amber-text)' },
+    { label: 'Bekleyen Talepler', val: pendingRequests,     icon: 'ti-refresh-alert', color: 'var(--blue-text)' },
+  ]
+  const recent = appointments.slice(0, 5)
+  const badgeFor = (s) => s === 'Confirmed' ? 'badge-green' : s === 'Cancelled' ? 'badge-red' : 'badge-amber'
+
   return (
     <div>
       <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>Staff Panel</div>
-      <div className="text-sm text-muted mb-4">Patient operations for today, Saturday 30 May 2026</div>
+      <div className="text-sm text-muted mb-4">Klinik randevu operasyonları özeti</div>
 
       {/* Metrics */}
       <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 20 }}>
-        {[
-          { label: "Today's Patient Operations", val: '24', icon: 'ti-users',           color: 'var(--teal)' },
-          { label: 'Pending Appointments',        val: '7',  icon: 'ti-clock',           color: 'var(--amber-text)' },
-          { label: 'Change Requests',             val: '4',  icon: 'ti-refresh-alert',   color: 'var(--blue-text)' },
-        ].map((m, i) => (
+        {metrics.map((m, i) => (
           <div key={i} className="metric-card">
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div className="metric-label">{m.label}</div>
               <i className={`ti ${m.icon}`} style={{ color: m.color, fontSize: 18 }} />
             </div>
-            <div className="metric-val">{m.val}</div>
+            <div className="metric-val">{loading ? '…' : m.val}</div>
           </div>
         ))}
       </div>
 
-      {/* Recent activities */}
+      {/* Recent appointments */}
       <div className="card">
-        <div className="card-header">Recent Activities</div>
-        {[
-          { icon: 'ti-circle-check', color: 'var(--green-text)', text: 'Appointment created for Ahmet Y. with Dr. Kaya' },
-          { icon: 'ti-refresh',      color: 'var(--blue-text)',  text: 'Elif K. appointment rescheduled' },
-          { icon: 'ti-circle-check', color: 'var(--green-text)', text: 'Can Ö. appointment cancelled' },
-          { icon: 'ti-circle-check', color: 'var(--green-text)', text: 'Appointment created for Selin A. with Dr. Yılmaz' },
-        ].map((a, i) => (
-          <div key={i} style={{
+        <div className="card-header">Son Randevular</div>
+        {loading ? (
+          <div style={{ padding: '10px 16px', fontSize: 13 }}>Yükleniyor...</div>
+        ) : recent.length === 0 ? (
+          <div style={{ padding: '10px 16px', fontSize: 13 }} className="text-muted">Henüz randevu kaydı yok.</div>
+        ) : recent.map((a, i) => (
+          <div key={a.id} style={{
             display: 'flex', alignItems: 'center', gap: 12,
             padding: '10px 16px',
-            borderBottom: i < 3 ? '0.5px solid var(--border)' : 'none',
+            borderBottom: i < recent.length - 1 ? '0.5px solid var(--border)' : 'none',
             fontSize: 13,
           }}>
-            <i className={`ti ${a.icon}`} style={{ color: a.color, fontSize: 16 }} />
-            <span style={{ flex: 1 }}>{a.text}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{['5 min ago', '23 min ago', '1 hour ago', '2 hours ago'][i]}</span>
+            <i className="ti ti-calendar-event" style={{ color: 'var(--teal)', fontSize: 16 }} />
+            <span style={{ flex: 1 }}><strong>{a.patient}</strong> → {a.doctor}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{a.date} {a.time}</span>
+            <span className={`badge ${badgeFor(a.status)}`} style={{ fontSize: 11 }}>{a.status}</span>
           </div>
         ))}
       </div>
@@ -179,6 +184,7 @@ function AssistedBooking() {
     : DOCTORS
 
   const availableDoctors = doctorOptions.filter(d => !branch || d.branch === branch)
+  const branchOptions = [...new Set(doctorOptions.map(d => d.branch).filter(Boolean))].sort()
   const activePatient = selectedPatient || (filteredPatients.length === 1 ? filteredPatients[0] : null)
   const activePatientName = activePatient ? activePatient.name : patientSearch
   const activePatientEmail = activePatient ? activePatient.email : patientEmail
@@ -433,7 +439,7 @@ function AssistedBooking() {
                   }}
                 >
                   <option value="">Select branch</option>
-                  {BRANCHES.map(b => <option key={b}>{b}</option>)}
+                  {branchOptions.map(b => <option key={b}>{b}</option>)}
                 </select>
               </div>
               <div>
@@ -504,6 +510,7 @@ function AssistedBooking() {
 function AppointmentManagement() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
   const [appointments, setAppointments] = useState(APPOINTMENTS)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -519,6 +526,7 @@ function AppointmentManagement() {
         const rows = await response.json()
         setAppointments(rows.map(a => ({
           id: `#APT-${a.id.toString().padStart(4, '0')}`,
+          dbId: a.id,
           patient: a.patient,
           doctor: a.doctor,
           date: a.date,
@@ -543,18 +551,40 @@ function AppointmentManagement() {
       a.doctor.toLowerCase().includes(search.toLowerCase()) ||
       a.id.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = !statusFilter || a.status.toLowerCase() === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesDate = !dateFilter || a.date === dateFilter
+    return matchesSearch && matchesStatus && matchesDate
   })
 
-  const handleApprove = (id) => {
-    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Confirmed', statusCls: 'badge-green' } : a))
-    setMessage('Appointment approved.')
+  const statusClass = (status) =>
+    status === 'Confirmed' ? 'badge-green' : status === 'Cancelled' ? 'badge-red' : 'badge-amber'
+
+  const updateStatus = async (appt, newStatus) => {
+    // Backend erişilemediğinde (yerel mock veri) sadece arayüzü güncelle
+    if (!appt.dbId) {
+      setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: newStatus, statusCls: statusClass(newStatus) } : a))
+      setMessage(newStatus === 'Confirmed' ? 'Appointment approved (yerel — kaydedilmedi).' : 'Appointment rejected (yerel — kaydedilmedi).')
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/appointments/${appt.dbId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body?.error || 'Durum güncellenemedi.')
+
+      setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: body.status, statusCls: statusClass(body.status) } : a))
+      setMessage(newStatus === 'Confirmed' ? 'Appointment approved.' : 'Appointment rejected.')
+    } catch (err) {
+      console.error(err)
+      setMessage(err.message || 'Durum güncellenemedi.')
+    }
   }
 
-  const handleReject = (id) => {
-    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled', statusCls: 'badge-red' } : a))
-    setMessage('Appointment rejected.')
-  }
+  const handleApprove = (appt) => updateStatus(appt, 'Confirmed')
+  const handleReject = (appt) => updateStatus(appt, 'Cancelled')
 
   return (
     <div>
@@ -580,7 +610,12 @@ function AppointmentManagement() {
           <option value="pending">Pending</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <input type="date" className="select-input" />
+        <input type="date" className="select-input" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="Tarihe göre filtrele" />
+        {dateFilter && (
+          <button type="button" className="btn btn-sm" onClick={() => setDateFilter('')} title="Tarih filtresini temizle">
+            <i className="ti ti-x" />
+          </button>
+        )}
       </div>
 
       {message && (
@@ -589,7 +624,8 @@ function AppointmentManagement() {
         </div>
       )}
       <div className="card">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div className="table-scroll">
+        <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
               {['Appt. ID', 'Patient', 'Doctor', 'Date', 'Type', 'Status', 'Actions'].map(h => (
@@ -612,7 +648,7 @@ function AppointmentManagement() {
                       type="button"
                       className="btn btn-sm"
                       style={{ fontSize: 11, padding: '3px 7px' }}
-                      onClick={() => handleApprove(a.id)}
+                      onClick={() => handleApprove(a)}
                       disabled={a.status !== 'Pending'}
                     >
                       <i className="ti ti-check" /> Approve
@@ -621,7 +657,7 @@ function AppointmentManagement() {
                       type="button"
                       className="btn btn-sm"
                       style={{ fontSize: 11, padding: '3px 7px', color: 'var(--red-text)' }}
-                      onClick={() => handleReject(a.id)}
+                      onClick={() => handleReject(a)}
                       disabled={a.status !== 'Pending'}
                     >
                       <i className="ti ti-x" /> Reject
@@ -632,22 +668,67 @@ function AppointmentManagement() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
 }
 
 function ChangeRequests() {
-  const [requests, setRequests] = useState(CHANGE_REQUESTS)
+  const [requests, setRequests] = useState([])
   const [statusMessage, setStatusMessage] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const updateRequest = (index, status) => {
-    setRequests(prev => prev.map((req, i) => i === index ? {
-      ...req,
-      status,
-      statusCls: status === 'Approved' ? 'badge-green' : status === 'Cancelled' ? 'badge-red' : req.statusCls,
-    } : req))
-    setStatusMessage(status === 'Approved' ? 'Request approved.' : 'Request rejected.')
+  const typeCls = (type) => type === 'Cancellation' ? 'badge-red' : 'badge-blue'
+  const statusCls = (status) => status === 'Approved' ? 'badge-green' : status === 'Rejected' ? 'badge-red' : 'badge-amber'
+
+  const mapRow = (r) => ({
+    id: r.id,
+    type: r.type,
+    typeCls: typeCls(r.type),
+    patient: r.patient,
+    doctor: r.doctor,
+    date: `${r.current_date} ${r.current_time}`,
+    newDate: r.type === 'Reschedule' && r.requested_date ? `${r.requested_date} ${r.requested_time}` : null,
+    status: r.status,
+    statusCls: statusCls(r.status),
+  })
+
+  const loadRequests = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const response = await fetch(`${API_URL}/api/change-requests`)
+      if (!response.ok) throw new Error('Talepler yüklenemedi.')
+      const rows = await response.json()
+      setRequests(rows.map(mapRow))
+    } catch (err) {
+      console.error(err)
+      setError('Değişiklik talepleri yüklenirken hata oluştu.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadRequests() }, [])
+
+  const updateRequest = async (id, status) => {
+    setStatusMessage('')
+    try {
+      const response = await fetch(`${API_URL}/api/change-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body?.error || 'Talep güncellenemedi.')
+
+      setRequests(prev => prev.map(req => req.id === id ? { ...req, status: body.status, statusCls: statusCls(body.status) } : req))
+      setStatusMessage(status === 'Approved' ? 'Talep onaylandı ve randevuya uygulandı.' : 'Talep reddedildi.')
+    } catch (err) {
+      setStatusMessage(err.message)
+    }
   }
 
   return (
@@ -661,9 +742,15 @@ function ChangeRequests() {
         </div>
       )}
 
+      {loading && <div className="alert alert-info">Talepler yükleniyor...</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+      {!loading && !error && requests.length === 0 && (
+        <div className="alert alert-warning">Şu anda bekleyen veya işlenmiş bir değişiklik talebi yok.</div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {requests.map((req, i) => (
-          <div key={i} className="card" style={{ padding: 16 }}>
+        {requests.map((req) => (
+          <div key={req.id} className="card" style={{ padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span className={`badge ${req.typeCls}`} style={{ fontSize: 11 }}>{req.type}</span>
@@ -671,17 +758,12 @@ function ChangeRequests() {
               </div>
               {req.status === 'Pending' && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-primary btn btn-sm" style={{ fontSize: 11 }} onClick={() => updateRequest(i, 'Approved')}>
+                  <button className="btn-primary btn btn-sm" style={{ fontSize: 11 }} onClick={() => updateRequest(req.id, 'Approved')}>
                     <i className="ti ti-check" /> Approve
                   </button>
-                  <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--red-text)' }} onClick={() => updateRequest(i, 'Cancelled')}>
+                  <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--red-text)' }} onClick={() => updateRequest(req.id, 'Rejected')}>
                     <i className="ti ti-x" /> Reject
                   </button>
-                  {req.type === 'Reschedule' && (
-                    <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--teal)' }} onClick={() => updateRequest(i, 'Rescheduled')}>
-                      <i className="ti ti-clock" /> Set New Time
-                    </button>
-                  )}
                 </div>
               )}
             </div>

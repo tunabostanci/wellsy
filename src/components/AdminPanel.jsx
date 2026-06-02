@@ -24,7 +24,7 @@ export default function AdminPanel() {
   const [specialty, setSpecialty] = useState('')
   const [clinic, setClinic] = useState('')
 
-  const apiUrl = 'http://localhost:4000'
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
   const fetchData = async () => {
     try {
@@ -91,7 +91,7 @@ export default function AdminPanel() {
       />
       <div className="main-area" style={{ overflowY: 'auto', height: '100vh', padding: 24 }}>
         {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-info" style={{ background: '#E1F5EE', color: '#0F6E56' }}>{success}</div>}
+        {success && <div className="alert alert-info" style={{ background: 'var(--teal-light)', color: 'var(--teal-dark)' }}>{success}</div>}
 
         {activeSection === 'overview' && (
           <div>

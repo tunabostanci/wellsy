@@ -76,6 +76,19 @@ async function initDb() {
       );
     `)
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS change_requests (
+        id SERIAL PRIMARY KEY,
+        appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        requested_date DATE,
+        requested_time TEXT,
+        status TEXT NOT NULL DEFAULT 'Pending',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `)
+
     // Varsayılan Kullanıcı Tohumlamaları (Seed)
     await pool.query(`
       INSERT INTO patients (name, tc, email, password, phone, role)
@@ -173,7 +186,7 @@ app.get('/api/appointments', async (req, res) => {
 
 // 6. YENİ RANDEVU KAYDETME (Parantezleri İzole Edilmiş ve Düzeltilmiş Hali)
 app.post('/api/appointments', async (req, res) => {
-  const { patient_name, patient_tc = '', patient_email = '', doctor_name, appointment_date, appointment_time, type = 'Online', note = '' } = req.body
+  const { patient_name, patient_tc = '', patient_email = '', patient_phone = '', doctor_name, appointment_date, appointment_time, type = 'Online', note = '' } = req.body
 
   if (!patient_name || !patient_email || !doctor_name || !appointment_date || !appointment_time) {
     return res.status(400).json({ error: 'Eksik randevu bilgileri gönderildi.' })
@@ -204,24 +217,55 @@ app.post('/api/appointments', async (req, res) => {
 
     if (!patient_id) {
       const insertPatient = await client.query(
-        `INSERT INTO patients (name, tc, email, role) VALUES ($1, $2, $3, 'Patient') RETURNING id`,
-        [patient_name, patient_tc, patient_email]
+        `INSERT INTO patients (name, tc, email, phone, role) VALUES ($1, $2, $3, $4, 'Patient') RETURNING id`,
+        [patient_name, patient_tc || null, patient_email, patient_phone || null]
       )
       patient_id = insertPatient.rows[0].id
     }
 
     const appointmentResult = await client.query(
-      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, type, note) VALUES ($1, $2, $3::DATE, $4, $5, $6) RETURNING id`,
+      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, type, note) VALUES ($1, $2, $3::DATE, $4, $5, $6) RETURNING id, status`,
       [patient_id, doctor_id, appointment_date, appointment_time, type, note]
     )
 
+    const appt = appointmentResult.rows[0]
     await client.query('COMMIT')
-    res.status(201).json({ success: true, id: appointmentResult.rows[0].id })
+    res.status(201).json({
+      success: true,
+      id: appt.id,
+      patient: patient_name,
+      doctor: doctor_name,
+      date: appointment_date,
+      time: appointment_time,
+      type,
+      status: appt.status,
+      note,
+    })
   } catch (err) {
     await client.query('ROLLBACK')
     res.status(500).json({ error: err.message })
   } finally {
     client.release()
+  }
+})
+
+// 6b. RANDEVU DURUMU GÜNCELLEME (Onayla / Reddet)
+app.patch('/api/appointments/:id/status', async (req, res) => {
+  const { status } = req.body
+  const allowed = ['Pending', 'Confirmed', 'Cancelled']
+  if (!status || !allowed.includes(status)) {
+    return res.status(400).json({ error: 'Geçersiz durum değeri. (Pending | Confirmed | Cancelled)' })
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING id, status',
+      [status, req.params.id]
+    )
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Randevu bulunamadı.' })
+    res.json(result.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
   }
 })
 
@@ -363,6 +407,115 @@ app.post('/api/patients', async (req, res) => {
     res.status(500).json({ error: 'Kayıt işlemi sırasında veritabanı hatası oluştu.' });
   }
 });
+
+// 13. DEĞİŞİKLİK TALEBİ OLUŞTURMA (Hasta: iptal / erteleme)
+app.post('/api/change-requests', async (req, res) => {
+  const { appointment_id, type, requested_date = null, requested_time = null } = req.body
+  const allowed = ['Cancellation', 'Reschedule']
+
+  if (!appointment_id || !allowed.includes(type)) {
+    return res.status(400).json({ error: 'Geçersiz talep. (appointment_id ve type: Cancellation | Reschedule zorunlu)' })
+  }
+  if (type === 'Reschedule' && (!requested_date || !requested_time)) {
+    return res.status(400).json({ error: 'Erteleme talebi için yeni tarih ve saat zorunludur.' })
+  }
+
+  try {
+    const appt = await pool.query('SELECT patient_id FROM appointments WHERE id = $1', [appointment_id])
+    if (appt.rowCount === 0) return res.status(404).json({ error: 'Randevu bulunamadı.' })
+
+    const dup = await pool.query(
+      "SELECT id FROM change_requests WHERE appointment_id = $1 AND status = 'Pending'",
+      [appointment_id]
+    )
+    if (dup.rowCount > 0) return res.status(409).json({ error: 'Bu randevu için zaten bekleyen bir talebiniz var.' })
+
+    const result = await pool.query(
+      `INSERT INTO change_requests (appointment_id, patient_id, type, requested_date, requested_time)
+       VALUES ($1, $2, $3, $4::DATE, $5) RETURNING id, status`,
+      [appointment_id, appt.rows[0].patient_id, type, requested_date, requested_time]
+    )
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// 14. DEĞİŞİKLİK TALEPLERİNİ LİSTELEME (Staff)
+app.get('/api/change-requests', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT cr.id, cr.type, cr.status,
+             cr.requested_date::TEXT AS requested_date, cr.requested_time,
+             p.name AS patient, d.name AS doctor,
+             a.appointment_date::TEXT AS current_date, a.appointment_time AS current_time
+      FROM change_requests cr
+      JOIN appointments a ON a.id = cr.appointment_id
+      JOIN patients p ON p.id = cr.patient_id
+      JOIN doctors d ON d.id = a.doctor_id
+      ORDER BY cr.created_at DESC
+    `)
+    res.json(result.rows)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// 15. DEĞİŞİKLİK TALEBİNİ İŞLEME (Staff: onayla / reddet)
+app.patch('/api/change-requests/:id', async (req, res) => {
+  const { status } = req.body
+  if (!['Approved', 'Rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Geçersiz durum. (Approved | Rejected)' })
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const crRes = await client.query('SELECT * FROM change_requests WHERE id = $1 FOR UPDATE', [req.params.id])
+    if (crRes.rowCount === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Talep bulunamadı.' })
+    }
+    const cr = crRes.rows[0]
+    if (cr.status !== 'Pending') {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: 'Bu talep zaten işlenmiş.' })
+    }
+
+    if (status === 'Approved') {
+      if (cr.type === 'Cancellation') {
+        await client.query("UPDATE appointments SET status = 'Cancelled' WHERE id = $1", [cr.appointment_id])
+      } else if (cr.type === 'Reschedule') {
+        const aRow = await client.query('SELECT doctor_id FROM appointments WHERE id = $1', [cr.appointment_id])
+        const doctor_id = aRow.rows[0].doctor_id
+        const conflict = await client.query(
+          'SELECT id FROM appointments WHERE doctor_id = $1 AND appointment_date = $2 AND appointment_time = $3 AND id <> $4',
+          [doctor_id, cr.requested_date, cr.requested_time, cr.appointment_id]
+        )
+        if (conflict.rowCount > 0) {
+          await client.query('ROLLBACK')
+          return res.status(409).json({ error: 'İstenen yeni saat dolu, talep onaylanamadı.' })
+        }
+        await client.query(
+          "UPDATE appointments SET appointment_date = $1, appointment_time = $2, status = 'Confirmed' WHERE id = $3",
+          [cr.requested_date, cr.requested_time, cr.appointment_id]
+        )
+      }
+    }
+
+    const upd = await client.query(
+      'UPDATE change_requests SET status = $1 WHERE id = $2 RETURNING id, status',
+      [status, req.params.id]
+    )
+    await client.query('COMMIT')
+    res.json(upd.rows[0])
+  } catch (err) {
+    await client.query('ROLLBACK')
+    res.status(500).json({ error: err.message })
+  } finally {
+    client.release()
+  }
+})
 
 // 404 Koruması ve Sunucu Tetikleme
 app.use((req, res) => { res.status(404).json({ error: 'Not found' }) })
