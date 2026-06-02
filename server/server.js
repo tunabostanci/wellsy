@@ -8,7 +8,7 @@ config()
 const { Pool } = pg
 const PORT = process.env.PORT || 4000
 
-// Orijinal bağlantı ayarlarınız korundu (wellsy_db şemasına yönlendirildi)
+// Orijinal veritabanı bağlantı havuzunuz
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@db:5432/wellsy_db'
 })
@@ -22,7 +22,6 @@ app.use(cors({
 }))
 app.use(express.json())
 
-// Veritabanı ve tablo ilklendirme kontrolü
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('Veritabanı bağlantı hatası:', err);
@@ -31,7 +30,7 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
-// 1. KULLANICI GİRİŞİ (LOGIN)
+// 1. KULLANICI GİRİŞİ (ORİJİNAL HALİNE BİREBİR GERİ DÖNDÜRÜLDÜ)
 app.post('/api/auth/login', async (req, res) => {
   const { email, password, role } = req.body;
   if (!email || !password || !role) {
@@ -39,129 +38,132 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
-    const targetEmail = email.trim().toLowerCase();
-    const targetRole = role.trim().toLowerCase();
     let result;
-
-    if (targetRole === 'doctor') {
-      result = await pool.query('SELECT id, name, email, password, specialty, clinic, \'doctor\' as role FROM doctors WHERE LOWER(email) = $1', [targetEmail]);
+    // Orijinal kodundaki gibi sadece e-postaya göre çekiyor, ekstra role filter'ı yapmıyor
+    if (role === 'doctor') {
+      result = await pool.query('SELECT id, name, email, password, \'doctor\' as role FROM doctors WHERE LOWER(email) = $1', [email.trim().toLowerCase()]);
     } else {
-      // Admin, staff veya patient rollerini harf duyarsız olarak kontrol eder
-      result = await pool.query('SELECT id, name, email, password, role FROM patients WHERE LOWER(email) = $1 AND LOWER(role) = $2', [targetEmail, targetRole]);
+      result = await pool.query('SELECT id, name, email, password, role FROM patients WHERE LOWER(email) = $1', [email.trim().toLowerCase()]);
     }
 
+    // Orijinal şifre kontrol mantığın
     if (result.rowCount === 0 || result.rows[0].password !== password) {
       return res.status(401).json({ error: 'Hatalı e-posta veya şifre girdiniz.' });
     }
 
     const user = result.rows[0];
-    delete user.password; // Güvenlik için şifreyi ön yüze göndermiyoruz
-    res.json(user);
+    res.json({ user }); // Ön yüzün beklediği { user: ... } formatı
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Giriş yapılırken sunucu hatası oluştu.' });
+    res.status(500).json({ error: 'Giriş hatası.' });
   }
 });
 
-// 2. SIFIRDAN HASTA KAYIT ETME (SIGN UP)
+// 2. SIFIRDAN HASTA KAYIT ETME (ORİJİNAL)
 app.post('/api/patients', async (req, res) => {
   const { name, tc, email, password, phone } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'İsim, e-posta ve şifre alanları zorunludur.' });
-  }
-
   try {
-    const targetEmail = email.trim().toLowerCase();
-
-    const checkEmail = await pool.query('SELECT id FROM patients WHERE LOWER(email) = $1', [targetEmail]);
-    if (checkEmail.rowCount > 0) {
-      return res.status(409).json({ error: 'Bu e-posta adresiyle daha önce kayıt olunmuş.' });
-    }
-
     const result = await pool.query(
       `INSERT INTO patients (name, tc, email, password, phone, role) 
        VALUES ($1, $2, $3, $4, $5, 'Patient') RETURNING id, name, email, role`,
-      [name.trim(), tc ? tc.trim() : null, targetEmail, password, phone ? phone.trim() : null]
+      [name, tc, email, password, phone]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Kayıt esnasında sunucu hatası oluştu.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// 3. ADMIN ÖZEL: FRONTEND'DEN GELEN DOKTOR OLUŞTURMA İSTEĞİ (CRITICAL FIXED)
+// 3. ADMIN ÖZEL: DOKTOR OLUŞTURMA
 app.post('/api/admin/create-doctor', async (req, res) => {
   const { name, specialty, clinic, email, password, tags } = req.body;
   try {
-    const targetEmail = email.trim().toLowerCase();
-    
-    const checkEmail = await pool.query('SELECT id FROM doctors WHERE LOWER(email) = $1', [targetEmail]);
-    if (checkEmail.rowCount > 0) {
-      return res.status(400).json({ error: 'Bu e-posta adresiyle bir doktor zaten mevcut.' });
-    }
-
     const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
     const result = await pool.query(
       `INSERT INTO doctors (initials, name, specialty, clinic, email, password, tags, match_score, rating, stars, avatarBg, avatarColor)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 90, 4.8, '★★★★★', '#E1F5EE', '#0F6E56') RETURNING id, name, email`,
-      [initials, name.trim(), specialty || 'General', clinic || 'Wellsy Clinic', targetEmail, password, tags || [specialty || 'General']]
+      [initials, name, specialty, clinic, email, password, tags]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Doktor hesabı oluşturulurken hata meydana geldi.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// 4. ADMIN ÖZEL: FRONTEND'DEN GELEN PERSONEL/ADMIN OLUŞTURMA İSTEĞİ (CRITICAL FIXED)
+// 4. ADMIN ÖZEL: STAFF OLUŞTURMA
 app.post('/api/admin/create-staff', async (req, res) => {
   const { name, email, password, role } = req.body;
   try {
-    const targetEmail = email.trim().toLowerCase();
-    const targetRole = role || 'Staff';
-
-    const checkEmail = await pool.query('SELECT id FROM patients WHERE LOWER(email) = $1', [targetEmail]);
-    if (checkEmail.rowCount > 0) {
-      return res.status(400).json({ error: 'Bu e-posta adresiyle kayıtlı bir kullanıcı zaten mevcut.' });
-    }
-
     const result = await pool.query(
       `INSERT INTO patients (name, email, password, role) 
        VALUES ($1, $2, $3, $4) RETURNING id, name, email, role`,
-      [name.trim(), targetEmail, password, targetRole]
+      [name, email, password, role]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Yetkili hesabı oluşturulurken hata meydana geldi.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // 5. DOKTORLARI LİSTELEME
 app.get('/api/doctors', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, initials, name, specialty, clinic, email, tags, date, time, visit, visitIcon, match_score, rating, stars, avatarBg, avatarColor FROM doctors ORDER BY id ASC');
+    const result = await pool.query('SELECT * FROM doctors ORDER BY id ASC');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 6. HASTALARI VE PERSONELLERİ LİSTELEME (ADMIN İÇİN)
+// 6. HASTALARI LİSTELEME
 app.get('/api/patients', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, tc, email, phone, role FROM patients ORDER BY id DESC');
+    const result = await pool.query('SELECT * FROM patients ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// server.js İÇİNE EKLENECEK ENTEGRASYON ENDPOINT'LERİ
+
+// 1. TÜM RANDEVULARI APPOINTMENTS TABLOSUNDAN CANLI LİSTELEME (STAFF İÇİN)
+app.get('/api/admin/all-appointments', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        a.id, 
+        p.email as patient_name, 
+        d.name as doctor_name, 
+        TO_CHAR(a.appointment_date, 'YYYY-MM-DD') as date, 
+        a.appointment_time as time, 
+        a.type, 
+        a.status 
+      FROM appointments a
+      JOIN patients p ON a.patient_id = p.id
+      JOIN doctors d ON a.doctor_id = d.id
+      ORDER BY a.id DESC
+    `);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 7. RANDEVU OLUŞTURMA (DOKTOR ADINA GÖRE ID BULMA VE ÇİFT REZERVASYON KORUMASI ENTEGRELİ)
+// 2. PERSONELİN RANDEVU DURUMUNU GÜNCELLEMESİ (APPROVE/REJECT)
+app.put('/api/appointments/:id/status', async (req, res) => {
+  const { status } = req.body;
+  const { id } = req.params;
+  try {
+    await pool.query('UPDATE appointments SET status = $1 WHERE id = $2', [status, id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. RANDEVU OLUŞTURMA
 app.post('/api/appointments', async (req, res) => {
   const { patient_email, doctor_name, appointment_date, appointment_time, type, note } = req.body;
-
   try {
     const patRes = await pool.query('SELECT id FROM patients WHERE LOWER(email) = $1', [patient_email.trim().toLowerCase()]);
     if (patRes.rowCount === 0) return res.status(444).json({ error: 'Hasta bulunamadı.' });
@@ -172,21 +174,21 @@ app.post('/api/appointments', async (req, res) => {
     const doctor_id = docRes.rows[0].id;
 
     const result = await pool.query(
-      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, type, note, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'Confirmed') RETURNING id`,
-      [patient_id, doctor_id, appointment_date, appointment_time, type || 'Online', note || '']
-    );
+  `INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, type, note, status)
+   VALUES ($1, $2, $3, $4, $5, $6, 'Pending') RETURNING id`, // 'Confirmed' olan yer 'Pending' yapıldı!
+  [patient_id, doctor_id, appointment_date, appointment_time, type, note]
+);
 
-    res.status(201).json({ 
-      success: true, 
-      id: `#APT-${result.rows[0].id.toString().padStart(4, '0')}`,
-      patient: patient_email,
-      doctor: doctor_name,
-      date: appointment_date,
-      time: appointment_time,
-      type: type || 'Online',
-      status: 'Confirmed'
-    });
+res.status(201).json({ 
+  success: true, 
+  id: `#APT-${result.rows[0].id.toString().padStart(4, '0')}`,
+  patient: patient_email,
+  doctor: doctor_name,
+  date: appointment_date,
+  time: appointment_time,
+  type: type,
+  status: 'Pending' // Ön yüze dönen ilk durum da artık 'Pending'
+});
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Seçilen doktorun bu saat dilimi doludur. Lütfen başka bir saat seçiniz.' });
@@ -195,15 +197,12 @@ app.post('/api/appointments', async (req, res) => {
   }
 });
 
-// 8. HASTANIN KENDİ RANDEVULARINI ÇEKMESİ
+// 8. HASTA RANDEVULARI
 app.get('/api/patients/:id/appointments', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT a.id, d.name as doctor, d.specialty as doctor_specialty, d.clinic, a.appointment_date as date, a.appointment_time as time, a.note, a.status 
-       FROM appointments a 
-       JOIN doctors d ON a.doctor_id = d.id 
-       WHERE a.patient_id = $1 
-       ORDER BY a.appointment_date ASC`, 
+       FROM appointments a JOIN doctors d ON a.doctor_id = d.id WHERE a.patient_id = $1 ORDER BY a.appointment_date ASC`, 
       [req.params.id]
     );
     res.json(result.rows);
@@ -212,15 +211,12 @@ app.get('/api/patients/:id/appointments', async (req, res) => {
   }
 });
 
-// 9. DOKTORUN KENDİ RANDEVULARINI ÇEKMESİ
+// 9. DOKTOR RANDEVULARI
 app.get('/api/doctors/:id/appointments', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT a.id, p.name as patient, p.email as patient_email, a.appointment_date as date, a.appointment_time as time, a.type, a.note, a.status 
-       FROM appointments a 
-       JOIN patients p ON a.patient_id = p.id 
-       WHERE a.doctor_id = $1 
-       ORDER BY a.appointment_date ASC`, 
+       FROM appointments a JOIN patients p ON a.patient_id = p.id WHERE a.doctor_id = $1 ORDER BY a.appointment_date ASC`, 
       [req.params.id]
     );
     res.json(result.rows);
@@ -229,7 +225,7 @@ app.get('/api/doctors/:id/appointments', async (req, res) => {
   }
 });
 
-// 10. DOKTORUN KENDİ TEKİL HASTALARINI LİSTELEMESİ
+// 10. DOKTORUN HASTALARI
 app.get('/api/doctors/:id/patients', async (req, res) => {
   try {
     const result = await pool.query(
@@ -274,10 +270,9 @@ app.post('/api/chatbot/chat', async (req, res) => {
   }
 });
 
-// SİSTEM BAŞLATICI VE SEED DATA KORUYUCU (TAM SENKRONİZASYON)
+// SİSTEM BAŞLATICI VE SEED DATA KORUYUCU (TC ÇAKIŞMASI KONTROLLÜ)
 const start = async () => {
   try {
-    // Tabloların varlığını arka planda garantiye alıyoruz
     await pool.query(`
       CREATE TABLE IF NOT EXISTS patients (
         id SERIAL PRIMARY KEY,
@@ -291,21 +286,34 @@ const start = async () => {
       );
     `);
 
-    // Admin seed verisi
-    await pool.query(`
-      INSERT INTO patients (name, tc, email, password, phone, role)
-      VALUES ('Sistem Yöneticisi', '45678901234', 'admin@wellsy.com', 'admin123', '0536 999 88 77', 'Admin')
-      ON CONFLICT (email) DO NOTHING;
-    `);
+    // Admin seed verisi kontrolü
+    const adminCheck = await pool.query('SELECT id FROM patients WHERE LOWER(email) = $1', ['admin@wellsy.com']);
+    if (adminCheck.rowCount === 0) {
+      await pool.query(`
+        INSERT INTO patients (name, tc, email, password, phone, role)
+        VALUES ('Sistem Yöneticisi', '45678901234', 'admin@wellsy.com', 'admin123', '0536 999 88 77', 'Admin')
+      `);
+    }
 
-    // Orijinal kodundaki Mustafa Mert Cemil personeli seed verisi korundu
-    await pool.query(`
-      INSERT INTO patients (name, tc, email, password, phone, role)
-      VALUES ('Mustafa Mert Cemil', '23456789012', 'mert@wellsy.com', 'staff123', '0532 444 55 66', 'Staff')
-      ON CONFLICT (email) DO NOTHING;
-    `);
+    // Mustafa Mert Cemil kontrolü (TC çakışması varsa tc alanını null geçerek çökmesi engellenir)
+    const staffEmailCheck = await pool.query('SELECT id FROM patients WHERE LOWER(email) = $1', ['mert@wellsy.com']);
+    const staffTcCheck = await pool.query('SELECT id FROM patients WHERE tc = $1', ['23456789012']);
 
-    console.log("PostgreSQL çalışma tabloları ve ana yetkili verileri doğrulandı.");
+    if (staffEmailCheck.rowCount === 0) {
+      if (staffTcCheck.rowCount === 0) {
+        await pool.query(`
+          INSERT INTO patients (name, tc, email, password, phone, role)
+          VALUES ('Mustafa Mert Cemil', '23456789012', 'mert@wellsy.com', 'staff123', '0532 444 55 66', 'Staff')
+        `);
+      } else {
+        await pool.query(`
+          INSERT INTO patients (name, tc, email, password, phone, role)
+          VALUES ('Mustafa Mert Cemil', null, 'mert@wellsy.com', 'staff123', '0532 444 55 66', 'Staff')
+        `);
+      }
+    }
+
+    console.log("PostgreSQL tabloları ve ana yetkili verileri doğrulandı.");
     app.listen(PORT, () => console.log(`Wellsy Core API Gateway ${PORT} portunda aktif.`));
   } catch (err) {
     console.error('Veritabanı başlatma hatası:', err);

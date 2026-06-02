@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = 'http://localhost:4000'
 
-/* ── Mock data ───────────────────────────────────────────────────── */
+/* ── Veritabanından Dönene Kadar Geçici Mock Listeler (Randevular Hariç) ──────────────── */
 const CHANGE_REQUESTS = [
   {
     type: 'Cancellation',   typeCls: 'badge-red',
@@ -14,80 +14,43 @@ const CHANGE_REQUESTS = [
     type: 'Reschedule',    typeCls: 'badge-blue',
     patient: 'Can Özkan',  doctor: 'Dr. Mehmet Yılmaz',
     date: '17 Nisan 11:00', newDate: '18 Nisan 10:00', status: 'Pending', statusCls: 'badge-amber',
-  },
-  {
-    type: 'Reschedule',    typeCls: 'badge-blue',
-    patient: 'Ahmet Yıldız', doctor: 'Dr. Ayşe Kaya',
-    date: '16 Nisan 09:00', newDate: '18 Nisan 10:00', status: 'Approved', statusCls: 'badge-green',
-  },
-  {
-    type: 'Cancellation',  typeCls: 'badge-red',
-    patient: 'Mehmet Arslan', doctor: 'Dr. Zeynep Demir',
-    date: '18 Nisan 12:00', newDate: null,   status: 'Cancelled', statusCls: '',
-  },
-]
-
-const APPOINTMENTS = [
-  { id: '#APT-2026-8412', patient: 'Elif K.', doctor: 'Dr. Ayşe Kaya',     date: '13 May 2026', time: '14:00', type: 'Online',     status: 'Confirmed', statusCls: 'badge-green' },
-  { id: '#APT-2026-8398', patient: 'Can Ö.',  doctor: 'Dr. Mehmet Yılmaz', date: '20 May 2026', time: '10:30', type: 'In-person',  status: 'Pending',   statusCls: 'badge-amber' },
-  { id: '#APT-2026-8380', patient: 'Selin A.',doctor: 'Dr. Zeynep Demir',  date: '22 May 2026', time: '09:00', type: 'Online',     status: 'Confirmed', statusCls: 'badge-green' },
-  { id: '#APT-2026-8370', patient: 'Murat D.',doctor: 'Dr. Ayşe Kaya',     date: '25 May 2026', time: '11:00', type: 'In-person',  status: 'Pending',   statusCls: 'badge-amber' },
+  }
 ]
 
 const PATIENTS = [
   { name: 'Elif Korkmaz',   tc: '12345678901', email: 'elif@email.com',   phone: '0533 111 22 33' },
-  { name: 'Can Özkan',      tc: '23456789012', email: 'can@email.com',    phone: '0532 222 33 44' },
-  { name: 'Selin Aydın',    tc: '34567890123', email: 'selin@email.com',  phone: '0534 333 44 55' },
-  { name: 'Murat Demir',    tc: '45678901234', email: 'murat@email.com',  phone: '0535 444 55 66' },
+  { name: 'Can Özkan',      tc: '23456789012', email: 'can@email.com',    phone: '0532 222 33 44' }
 ]
 
 const DOCTORS = [
   { name: 'Dr. Ayşe Kaya', branch: 'Clinical Psychologist' },
   { name: 'Dr. Mehmet Yılmaz', branch: 'Psychiatrist' },
-  { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychologist' },
-  { name: 'Dr. Selin Aydın', branch: 'Neurology' },
+  { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychologist' }
 ]
+
 const BRANCHES = ['Clinical Psychologist', 'Psychiatrist', 'Neurology', 'Internal Medicine']
 const SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
 
 function calculateUrgency(description) {
   const text = (description || '').toLowerCase()
-  if (!text.trim()) {
-    return { label: 'Belirlenmedi', badge: 'badge-amber' }
-  }
-
-  const urgentWords = ['şiddetli', 'acı', 'şok', 'nefes', 'kanama', 'bayıl', 'kalp', 'angina', 'göğüs', 'hızlı', 'solunum', 'şuur', 'bilinç', 'göğüs ağrısı']
-  const highWords = ['sürekli', 'yüksek ateş', 'ateş', 'şişlik', 'ağrı', 'kusma', 'baş dönmesi', 'baş ağrısı', 'nefes darlığı']
-  const moderateWords = ['hafif', 'yavaş', 'uzun süren', 'rahatsızlık', 'halsizlik', 'yorgunluk']
-
-  if (urgentWords.some(word => text.includes(word))) {
-    return { label: 'Acil', badge: 'badge-red' }
-  }
-
-  if (highWords.some(word => text.includes(word))) {
-    return { label: 'Yüksek', badge: 'badge-amber' }
-  }
-
-  if (moderateWords.some(word => text.includes(word))) {
-    return { label: 'Orta', badge: 'badge-blue' }
-  }
-
-  return { label: 'Düşük', badge: 'badge-green' }
+  if (!text.trim()) return { label: 'Belirlenmedi', badge: 'badge-amber' }
+  const urgentWords = ['şiddetli', 'acı', 'şok', 'nefes', 'kanama', 'bayıl', 'kalp', 'göğüs', 'göğüs ağrısı']
+  if (urgentWords.some(word => text.includes(word))) return { label: 'Acil', badge: 'badge-red' }
+  return { label: 'Normal', badge: 'badge-blue' }
 }
 
-/* ── Sub-views ───────────────────────────────────────────────────── */
+/* ── 1. DASHBOARD SUB-VIEW ──────────────────────────────────────── */
 function StaffDashboard() {
   return (
     <div>
       <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>Staff Panel</div>
-      <div className="text-sm text-muted mb-4">Patient operations for today, Saturday 30 May 2026</div>
+      <div className="text-sm text-muted mb-4">Klinik günlük operasyon ve randevu takip paneli.</div>
 
-      {/* Metrics */}
       <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 20 }}>
         {[
-          { label: "Today's Patient Operations", val: '24', icon: 'ti-users',           color: 'var(--teal)' },
-          { label: 'Pending Appointments',        val: '7',  icon: 'ti-clock',           color: 'var(--amber-text)' },
-          { label: 'Change Requests',             val: '4',  icon: 'ti-refresh-alert',   color: 'var(--blue-text)' },
+          { label: "Bugünün Klinik İşlemleri", val: '12', icon: 'ti-users',           color: 'var(--teal)' },
+          { label: 'Onay Bekleyen Talepler',        val: 'Önizleme',  icon: 'ti-clock',           color: 'var(--amber-text)' },
+          { label: 'Değişiklik İstekleri',             val: '2',  icon: 'ti-refresh-alert',   color: 'var(--blue-text)' },
         ].map((m, i) => (
           <div key={i} className="metric-card">
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -98,32 +61,11 @@ function StaffDashboard() {
           </div>
         ))}
       </div>
-
-      {/* Recent activities */}
-      <div className="card">
-        <div className="card-header">Recent Activities</div>
-        {[
-          { icon: 'ti-circle-check', color: 'var(--green-text)', text: 'Appointment created for Ahmet Y. with Dr. Kaya' },
-          { icon: 'ti-refresh',      color: 'var(--blue-text)',  text: 'Elif K. appointment rescheduled' },
-          { icon: 'ti-circle-check', color: 'var(--green-text)', text: 'Can Ö. appointment cancelled' },
-          { icon: 'ti-circle-check', color: 'var(--green-text)', text: 'Appointment created for Selin A. with Dr. Yılmaz' },
-        ].map((a, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '10px 16px',
-            borderBottom: i < 3 ? '0.5px solid var(--border)' : 'none',
-            fontSize: 13,
-          }}>
-            <i className={`ti ${a.icon}`} style={{ color: a.color, fontSize: 16 }} />
-            <span style={{ flex: 1 }}>{a.text}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{['5 min ago', '23 min ago', '1 hour ago', '2 hours ago'][i]}</span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
 
+/* ── 2. ASSISTED BOOKING SUB-VIEW ────────────────────────────────── */
 function AssistedBooking() {
   const [patientSearch, setPatientSearch] = useState('')
   const [selectedPatient, setSelectedPatient] = useState(null)
@@ -135,437 +77,186 @@ function AssistedBooking() {
   const [doctor, setDoctor] = useState('')
   const [date, setDate] = useState('')
   const [slot, setSlot] = useState('')
-  const [visitType, setVisitType] = useState('')
+  const [visitType, setVisitType] = useState('Online')
   const [note, setNote] = useState('')
   const [booked, setBooked] = useState(false)
   const [bookingInfo, setBookingInfo] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
-  const [loading, setLoading] = useState(true)
   const [doctors, setDoctors] = useState([])
   const [patients, setPatients] = useState([])
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [docRes, patRes] = await Promise.all([
-          fetch(`${API_URL}/api/doctors`),
-          fetch(`${API_URL}/api/patients`),
-        ])
-
-        if (!docRes.ok || !patRes.ok) {
-          throw new Error('Unable to load doctors or patients from the backend.')
-        }
-
-        setDoctors(await docRes.json())
-        setPatients(await patRes.json())
-      } catch (err) {
-        console.error(err)
-        setErrorMessage('Unable to load doctors or patients. Please refresh or try again later.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadData()
+    Promise.all([
+      fetch(`${API_URL}/api/doctors`).then(res => res.json()),
+      fetch(`${API_URL}/api/patients`).then(res => res.json())
+    ]).then(([docData, patData]) => {
+      setDoctors(docData)
+      setPatients(patData)
+    }).catch(() => setErrorMessage('Klinik kaynakları backendden yüklenemedi.'))
   }, [])
 
-  const patientOptions = patients.length > 0 ? patients : PATIENTS
-  const filteredPatients = patientSearch.length > 1
-    ? patientOptions.filter(p => p.name.toLowerCase().includes(patientSearch.toLowerCase()) || p.tc?.includes(patientSearch))
-    : []
-
-  const doctorOptions = doctors.length > 0
-    ? doctors.map(d => ({ name: d.name, branch: d.specialty || 'General' }))
-    : DOCTORS
-
-  const availableDoctors = doctorOptions.filter(d => !branch || d.branch === branch)
-  const activePatient = selectedPatient || (filteredPatients.length === 1 ? filteredPatients[0] : null)
-  const activePatientName = activePatient ? activePatient.name : patientSearch
-  const activePatientEmail = activePatient ? activePatient.email : patientEmail
-  const activePatientPhone = activePatient ? activePatient.phone : patientPhone
-  const activePatientTc = activePatient ? activePatient.tc : patientTc
-  const urgency = calculateUrgency(symptomDescription)
-  const canBook = activePatientName && activePatientEmail && branch && doctor && date && slot && visitType && symptomDescription.trim()
-
-  const resetForm = () => {
-    setBooked(false)
-    setBookingInfo(null)
-    setSelectedPatient(null)
-    setPatientSearch('')
-    setPatientEmail('')
-    setPatientPhone('')
-    setPatientTc('')
-    setBranch('')
-    setDoctor('')
-    setDate('')
-    setSlot('')
-    setVisitType('')
-    setNote('')
-    setErrorMessage('')
-  }
+  const availableDoctors = doctors.filter(d => !branch || d.specialty === branch)
+  const canBook = patientEmail && doctor && date && slot
 
   const handleBook = async () => {
-    if (!canBook) {
-      setErrorMessage('Please select a patient and complete all required fields.')
-      return
-    }
-
-    setErrorMessage('')
-
     try {
       const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patient_name: activePatientName,
-          patient_tc: activePatientTc || '',
-          patient_email: activePatientEmail,
-          patient_phone: activePatientPhone || '',
+          patient_email: patientEmail,
           doctor_name: doctor,
           appointment_date: date,
           appointment_time: slot,
           type: visitType,
-          note: symptomDescription.trim() ? `${symptomDescription.trim()}${note ? ' — ' + note.trim() : ''}` : note,
+          note: symptomDescription
         }),
       })
-
       const body = await response.json()
-      if (!response.ok) {
-        throw new Error(body?.error || 'Unable to create appointment')
-      }
-
+      if (!response.ok) throw new Error(body.error || 'Randevu oluşturulamadı.')
       setBookingInfo(body)
       setBooked(true)
-      setSelectedPatient(null)
     } catch (err) {
-      console.error(err)
-      setErrorMessage(err.message || 'Unable to create appointment.')
+      setErrorMessage(err.message)
     }
-  }
-
-  if (loading) {
-    return <div className="card" style={{ padding: 24 }}>Loading clinic resources...</div>
   }
 
   if (booked && bookingInfo) {
     return (
-      <div style={{ maxWidth: 540, margin: '0 auto' }}>
-        <div className="card" style={{ padding: 24, textAlign: 'center' }}>
-          <i className="ti ti-circle-check" style={{ fontSize: 40, color: 'var(--teal)', marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8 }}>Appointment Created Successfully</div>
-          <div className="text-sm text-muted mb-4">The appointment has been saved to the clinic system.</div>
-          <div style={{
-            background: 'var(--bg-surface)', borderRadius: 'var(--r-md)',
-            padding: '14px 16px', textAlign: 'left', marginBottom: 16, fontSize: 13,
-          }}>
-            <div><strong>Appointment ID:</strong> {bookingInfo.id}</div>
-            <div><strong>Patient:</strong> {bookingInfo.patient}</div>
-            <div><strong>Doctor:</strong> {bookingInfo.doctor}</div>
-            <div><strong>Date:</strong> {bookingInfo.date} {bookingInfo.time}</div>
-            <div><strong>Type:</strong> {bookingInfo.type}</div>
-            <div><strong>Status:</strong> {bookingInfo.status}</div>
-          </div>
-          <button className="btn-primary btn btn-sm" onClick={resetForm}>
-            Create New Appointment
-          </button>
-        </div>
+      <div className="card" style={{ padding: 24, textAlign: 'center', maxWidth: 500, margin: '0 auto' }}>
+        <i className="ti ti-circle-check" style={{ fontSize: 40, color: 'var(--teal)', marginBottom: 12 }} />
+        <h4>Randevu Başarıyla Taleplere Eklendi</h4>
+        <p className="text-sm text-muted mb-3">Oluşturulan randevu bekleme durumunda (Pending) sisteme işlenmiştir.</p>
+        <button className="btn-primary btn" onClick={() => setBooked(false)}>Yeni Randevu Yaz</button>
       </div>
     )
   }
 
   return (
-    <div>
-      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Create Appointment for Patient</div>
-      <div className="text-sm text-muted mb-4">Create a new appointment on behalf of the patient</div>
+    <div style={{ maxWidth: 560 }}>
+      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>Hasta Bilgileri</div>
+        <input className="text-input w-full mb-2" placeholder="Hasta E-posta Adresi" value={patientEmail} onChange={e => setPatientEmail(e.target.value)} />
+        <textarea className="text-input w-full" placeholder="Şikayet / Belirtiler (Triage Öncelik Belirleme İçin)" value={symptomDescription} onChange={e => setSymptomDescription(e.target.value)} />
+      </div>
 
-      <div style={{ maxWidth: 560 }}>
-        <div className="card" style={{ marginBottom: 14 }}>
-          <div className="card-header">Patient Information</div>
-          <div style={{ padding: 14, display: 'grid', gap: 12 }}>
-            <div style={{ position: 'relative' }}>
-              <input
-                className="text-input"
-                style={{ width: '100%', borderRadius: 'var(--r-md)', padding: '8px 12px', border: '1px solid var(--border-md)', fontSize: 13 }}
-                placeholder="Search existing patient by TC or name..."
-                value={patientSearch}
-                onChange={e => {
-                  const value = e.target.value
-                  setPatientSearch(value)
-                  setSelectedPatient(null)
-                  const exactMatch = patientOptions.find(p => p.name.toLowerCase() === value.toLowerCase() || p.tc === value)
-                  if (exactMatch) {
-                    setSelectedPatient(exactMatch)
-                    setPatientEmail(exactMatch.email || '')
-                    setPatientPhone(exactMatch.phone || '')
-                    setPatientTc(exactMatch.tc || '')
-                  }
-                }}
-              />
-              {filteredPatients.length > 0 && !selectedPatient && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                  background: '#fff', border: '1px solid var(--border-md)',
-                  borderRadius: 'var(--r-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  marginTop: 4,
-                }}>
-                  {filteredPatients.map((p, i) => (
-                    <div
-                      key={i}
-                      style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, borderBottom: i < filteredPatients.length - 1 ? '0.5px solid var(--border)' : 'none' }}
-                      onClick={() => {
-                        setSelectedPatient(p)
-                        setPatientSearch(p.name)
-                        setPatientEmail(p.email || '')
-                        setPatientPhone(p.phone || '')
-                        setPatientTc(p.tc || '')
-                      }}
-                    >
-                      <strong>{p.name}</strong>
-                      <span style={{ color: 'var(--text-3)', marginLeft: 10 }}>{p.tc || p.email}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Patient Name</label>
-                <input
-                  className="text-input"
-                  style={{ width: '100%' }}
-                  value={activePatientName}
-                  onChange={e => {
-                    setPatientSearch(e.target.value)
-                    setSelectedPatient(null)
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>TC / National ID</label>
-                <input
-                  className="text-input"
-                  style={{ width: '100%' }}
-                  value={activePatientTc || ''}
-                  onChange={e => {
-                    setPatientTc(e.target.value)
-                    setSelectedPatient(null)
-                  }}
-                  placeholder="Optional"
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Email</label>
-                <input
-                  className="text-input"
-                  style={{ width: '100%' }}
-                  value={activePatientEmail || ''}
-                  onChange={e => {
-                    setPatientEmail(e.target.value)
-                    setSelectedPatient(null)
-                  }}
-                  placeholder="Required"
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Phone</label>
-                <input
-                  className="text-input"
-                  style={{ width: '100%' }}
-                  value={activePatientPhone || ''}
-                  onChange={e => {
-                    setPatientPhone(e.target.value)
-                    setSelectedPatient(null)
-                  }}
-                  placeholder="Optional"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Hastalık / Şikayet Açıklaması</label>
-              <textarea
-                className="text-input"
-                style={{ width: '100%', minHeight: 96, resize: 'vertical' }}
-                placeholder="Hasta durumu ne kadar acil? Örneğin: şiddetli baş ağrısı, nefes darlığı, ateş..."
-                value={symptomDescription}
-                onChange={e => setSymptomDescription(e.target.value)}
-              />
-              {symptomDescription.trim() && (
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Triage seviyesi:</span>
-                  <span className={`badge ${urgency.badge}`}>{urgency.label}</span>
-                </div>
-              )}
-            </div>
-
-            {selectedPatient && (
-              <div style={{
-                marginTop: 10, padding: '10px 12px', background: 'var(--teal-light)',
-                borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--teal-dark)',
-              }}>
-                <i className="ti ti-user-check" style={{ marginRight: 8 }} />
-                <strong>{selectedPatient.name}</strong> · {selectedPatient.email} · {selectedPatient.phone}
-              </div>
-            )}
-          </div>
+      <div className="card" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>Branş & Doktor Seçimi</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <select className="select-input" value={branch} onChange={e => setBranch(e.target.value)}>
+            <option value="">Branş Seçiniz</option>
+            {BRANCHES.map(b => <option key={b}>{b}</option>)}
+          </select>
+          <select className="select-input" value={doctor} onChange={e => setDoctor(e.target.value)}>
+            <option value="">Doktor Seçiniz</option>
+            {availableDoctors.map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
+          </select>
         </div>
-
-        <div className="card" style={{ marginBottom: 14 }}>
-          <div className="card-header">Appointment Details</div>
-          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Branch</label>
-                <select
-                  className="select-input"
-                  style={{ width: '100%' }}
-                  value={branch}
-                  onChange={e => {
-                    setBranch(e.target.value)
-                    if (doctor) {
-                      const valid = doctorOptions.some(d => d.name === doctor && d.branch === e.target.value)
-                      if (!valid) setDoctor('')
-                    }
-                  }}
-                >
-                  <option value="">Select branch</option>
-                  {BRANCHES.map(b => <option key={b}>{b}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Doctor</label>
-                <select
-                  className="select-input"
-                  style={{ width: '100%' }}
-                  value={doctor}
-                  onChange={e => setDoctor(e.target.value)}
-                  disabled={!branch}
-                >
-                  <option value="">{branch ? 'Select doctor' : 'Choose branch first'}</option>
-                  {availableDoctors.map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
-                </select>
-                {branch && availableDoctors.length === 0 && (
-                  <div className="text-sm text-muted" style={{ marginTop: 6 }}>No providers available for this branch yet.</div>
-                )}
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Date</label>
-                <input type="date" className="select-input" style={{ width: '100%' }} value={date} onChange={e => setDate(e.target.value)} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Time Slot</label>
-                <select className="select-input" style={{ width: '100%' }} value={slot} onChange={e => setSlot(e.target.value)}>
-                  <option value="">Select slot</option>
-                  {SLOTS.map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Visit Type</label>
-              <select className="select-input" style={{ width: '100%' }} value={visitType} onChange={e => setVisitType(e.target.value)}>
-                <option value="">Select type</option>
-                <option>Online</option>
-                <option>In-person</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Note (optional)</label>
-              <textarea
-                style={{ width: '100%', border: '1px solid var(--border-md)', borderRadius: 'var(--r-md)', padding: '8px 12px', fontSize: 13, minHeight: 72, resize: 'vertical', fontFamily: 'var(--font)' }}
-                placeholder="Add a note for the appointment..."
-                value={note}
-                onChange={e => setNote(e.target.value)}
-              />
-            </div>
-
-            {errorMessage && (
-              <div style={{ color: 'var(--red-text)', fontSize: 13, marginBottom: 10 }}>{errorMessage}</div>
-            )}
-            <button
-              type="button"
-              className="btn-primary btn"
-              disabled={!canBook}
-              onClick={handleBook}
-              style={{ opacity: canBook ? 1 : 0.5 }}
-            >
-              <i className="ti ti-calendar-plus" /> Create Appointment
-            </button>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <input type="date" className="text-input" value={date} onChange={e => setDate(e.target.value)} />
+          <select className="select-input" value={slot} onChange={e => setSlot(e.target.value)}>
+            <option value="">Saat Seçiniz</option>
+            {SLOTS.map(s => <option key={s}>{s}</option>)}
+          </select>
         </div>
+        {errorMessage && <div className="alert alert-error mb-2">{errorMessage}</div>}
+        <button className="btn-primary btn w-full" disabled={!canBook} onClick={handleBook}>Randevuyu Sisteme İşle</button>
       </div>
     </div>
   )
 }
 
+/* ── 3. APPOINTMENT MANAGEMENT SUB-VIEW (DİNAMİK ONAYLAMA & REDDETME AKTİF) ── */
 function AppointmentManagement() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [appointments, setAppointments] = useState(APPOINTMENTS)
-  const [message, setMessage] = useState('')
+  const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  // Canlı randevuları veritabanından çeken fonksiyon
+  const loadRealTimeAppointments = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${API_URL}/api/admin/all-appointments`)
+      if (!response.ok) throw new Error('Randevular veritabanından alınamadı.')
+      const data = await response.json()
+      
+      // Gelen verileri tabloya uygun formata map'liyoruz
+      const mapped = data.map(a => ({
+        id: a.id,
+        formattedId: `#APT-${a.id.toString().padStart(4, '0')}`,
+        patient: a.patient_name || 'Bilinmeyen Hasta',
+        doctor: a.doctor_name || 'Bilinmeyen Doktor',
+        date: a.date,
+        time: a.time,
+        type: a.type || 'Online',
+        status: a.status || 'Pending',
+        statusCls: a.status?.toLowerCase() === 'confirmed' ? 'badge-green' : a.status?.toLowerCase() === 'cancelled' ? 'badge-red' : 'badge-amber',
+      }))
+      setAppointments(mapped)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const loadAppointments = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/appointments`)
-        if (!response.ok) {
-          throw new Error('Unable to load appointments.')
-        }
-        const rows = await response.json()
-        setAppointments(rows.map(a => ({
-          id: `#APT-${a.id.toString().padStart(4, '0')}`,
-          patient: a.patient,
-          doctor: a.doctor,
-          date: a.date,
-          time: a.time,
-          type: a.type,
-          status: a.status,
-          statusCls: a.status.toLowerCase() === 'confirmed' ? 'badge-green' : a.status.toLowerCase() === 'cancelled' ? 'badge-red' : 'badge-amber',
-        })))
-      } catch (err) {
-        console.error(err)
-        setError('Unable to load appointments. Showing local history only.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadAppointments()
+    loadRealTimeAppointments()
   }, [])
+
+  // CANLI ONAYLAMA (APPROVE) FONKSİYONU
+  const handleApprove = async (numericId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/appointments/${numericId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Confirmed' })
+      })
+      if (!response.ok) throw new Error('Onaylama işlemi başarısız.')
+      setMessage(`Randevu #${numericId} başarıyla onaylandı (Confirmed).`)
+      loadRealTimeAppointments() // Listeyi canlı olarak yeniler
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // CANLI REDDETME / İPTAL (REJECT) FONKSİYONU
+  const handleReject = async (numericId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/appointments/${numericId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Cancelled' })
+      })
+      if (!response.ok) throw new Error('Reddetme işlemi başarısız.')
+      setMessage(`Randevu #${numericId} personel tarafından iptal edildi (Cancelled).`)
+      loadRealTimeAppointments() // Listeyi canlı olarak yeniler
+    } catch (err) {
+      setError(err.message)
+    }
+  }
 
   const filtered = appointments.filter(a => {
     const matchesSearch = a.patient.toLowerCase().includes(search.toLowerCase()) ||
       a.doctor.toLowerCase().includes(search.toLowerCase()) ||
-      a.id.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = !statusFilter || a.status.toLowerCase() === statusFilter
+      a.formattedId.toLowerCase().includes(search.toLowerCase())
+    const matchesStatus = !statusFilter || a.status.toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesStatus
   })
 
-  const handleApprove = (id) => {
-    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Confirmed', statusCls: 'badge-green' } : a))
-    setMessage('Appointment approved.')
-  }
-
-  const handleReject = (id) => {
-    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled', statusCls: 'badge-red' } : a))
-    setMessage('Appointment rejected.')
-  }
-
   return (
-    <div>
-      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Appointment Management</div>
-      <div className="text-sm text-muted mb-4">Search, filter, and update appointment records</div>
+    <div style={{ width: '100%' }}>
+      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Klinik Canlı Randevu Listesi</div>
+      <div className="text-sm text-muted mb-4">Veritabanından çekilen gerçek zamanlı randevuları yönetin, onaylayın veya iptal edin.</div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
           className="text-input"
-          style={{ flex: 1, minWidth: 250, borderRadius: 'var(--r-md)', padding: '7px 12px', border: '1px solid var(--border-md)', fontSize: 13 }}
-          placeholder="Search by patient, doctor or ID..."
+          style={{ flex: 1, minWidth: 250 }}
+          placeholder="Hasta e-posta, doktor adı veya ID ile arama yapın..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -575,145 +266,84 @@ function AppointmentManagement() {
           onChange={e => setStatusFilter(e.target.value)}
           style={{ minWidth: 140 }}
         >
-          <option value="">All statuses</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="pending">Pending</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="">Tüm Durumlar</option>
+          <option value="confirmed">Confirmed (Onaylı)</option>
+          <option value="pending">Pending (Beklemede)</option>
+          <option value="cancelled">Cancelled (İptal)</option>
         </select>
-        <input type="date" className="select-input" />
       </div>
 
-      {message && (
-        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--r-md)', color: 'var(--text-2)' }}>
-          {message}
-        </div>
-      )}
+      {message && <div className="alert alert-info" style={{ background: '#E1F5EE', color: '#0F6E56', marginBottom: 12 }}>{message}</div>}
+      {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+
       <div className="card">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
-              {['Appt. ID', 'Patient', 'Doctor', 'Date', 'Type', 'Status', 'Actions'].map(h => (
-                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text-3)', fontWeight: 500, fontSize: 12 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((a, i) => (
-              <tr key={i} style={{ borderBottom: '0.5px solid var(--border)' }}>
-                <td style={{ padding: '9px 14px', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)' }}>{a.id}</td>
-                <td style={{ padding: '9px 14px', fontWeight: 500 }}>{a.patient}</td>
-                <td style={{ padding: '9px 14px', color: 'var(--text-2)' }}>{a.doctor}</td>
-                <td style={{ padding: '9px 14px', color: 'var(--text-2)' }}>{a.date} {a.time}</td>
-                <td style={{ padding: '9px 14px' }}><span className="tag">{a.type}</span></td>
-                <td style={{ padding: '9px 14px' }}><span className={`badge ${a.statusCls}`} style={{ fontSize: 11 }}>{a.status}</span></td>
-                <td style={{ padding: '9px 14px' }}>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ fontSize: 11, padding: '3px 7px' }}
-                      onClick={() => handleApprove(a.id)}
-                      disabled={a.status !== 'Pending'}
-                    >
-                      <i className="ti ti-check" /> Approve
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ fontSize: 11, padding: '3px 7px', color: 'var(--red-text)' }}
-                      onClick={() => handleReject(a.id)}
-                      disabled={a.status !== 'Pending'}
-                    >
-                      <i className="ti ti-x" /> Reject
-                    </button>
-                  </div>
-                </td>
+        {loading ? (
+          <div style={{ padding: 20 }}>Canlı veritabanı kayıtları yükleniyor...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 20 }} className="text-muted">Eşleşen veya veritabanında kayıtlı canlı randevu bulunamadı.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                {['Randevu ID', 'Hasta E-posta', 'Doktor', 'Tarih', 'Saat', 'Tip', 'Durum', 'Aksiyonlar'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text-3)', fontWeight: 500 }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((a) => (
+                <tr key={a.id} style={{ borderBottom: '0.5px solid var(--border)' }}>
+                  <td style={{ padding: '9px 14px', fontFamily: 'monospace', color: 'var(--text-3)' }}>{a.formattedId}</td>
+                  <td style={{ padding: '9px 14px', fontWeight: 500 }}>{a.patient}</td>
+                  <td style={{ padding: '9px 14px' }}>{a.doctor}</td>
+                  <td style={{ padding: '9px 14px' }}>{a.date}</td>
+                  <td style={{ padding: '9px 14px' }}>{a.time}</td>
+                  <td style={{ padding: '9px 14px' }}><span className="tag">{a.type}</span></td>
+                  <td style={{ padding: '9px 14px' }}><span className={`badge ${a.statusCls}`}>{a.status}</span></td>
+                  <td style={{ padding: '9px 14px' }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        style={{ padding: '4px 8px', fontSize: '11px', background: '#008069', border: 'none', color: 'white' }}
+                        onClick={() => handleApprove(a.id)}
+                        disabled={a.status.toLowerCase() !== 'pending'}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--red-text)', background: 'var(--red-bg)', border: 'none' }}
+                        onClick={() => handleReject(a.id)}
+                        disabled={a.status.toLowerCase() !== 'pending'}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )
 }
 
+/* ── 4. CHANGE REQUESTS SUB-VIEW ────────────────────────────────── */
 function ChangeRequests() {
-  const [requests, setRequests] = useState(CHANGE_REQUESTS)
-  const [statusMessage, setStatusMessage] = useState('')
-
-  const updateRequest = (index, status) => {
-    setRequests(prev => prev.map((req, i) => i === index ? {
-      ...req,
-      status,
-      statusCls: status === 'Approved' ? 'badge-green' : status === 'Cancelled' ? 'badge-red' : req.statusCls,
-    } : req))
-    setStatusMessage(status === 'Approved' ? 'Request approved.' : 'Request rejected.')
-  }
-
   return (
     <div>
-      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Change Requests</div>
-      <div className="text-sm text-muted mb-4">Process cancellation and rescheduling requests</div>
-
-      {statusMessage && (
-        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--r-md)', color: 'var(--text-2)' }}>
-          {statusMessage}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {requests.map((req, i) => (
-          <div key={i} className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span className={`badge ${req.typeCls}`} style={{ fontSize: 11 }}>{req.type}</span>
-                <span className={`badge ${req.statusCls}`} style={{ fontSize: 11 }}>{req.status}</span>
-              </div>
-              {req.status === 'Pending' && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-primary btn btn-sm" style={{ fontSize: 11 }} onClick={() => updateRequest(i, 'Approved')}>
-                    <i className="ti ti-check" /> Approve
-                  </button>
-                  <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--red-text)' }} onClick={() => updateRequest(i, 'Cancelled')}>
-                    <i className="ti ti-x" /> Reject
-                  </button>
-                  {req.type === 'Reschedule' && (
-                    <button className="btn btn-sm" style={{ fontSize: 11, color: 'var(--teal)' }} onClick={() => updateRequest(i, 'Rescheduled')}>
-                      <i className="ti ti-clock" /> Set New Time
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, fontSize: 13 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Patient</div>
-                <div style={{ fontWeight: 500 }}>{req.patient}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Doctor</div>
-                <div>{req.doctor}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Current Date</div>
-                <div>{req.date}</div>
-              </div>
-              {req.newDate && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>New Date</div>
-                  <div style={{ color: 'var(--teal-dark)', fontWeight: 500 }}>{req.newDate}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Tarih Değişiklik Talepleri</div>
+      <div className="text-sm text-muted mb-4">Hastaların iptal ve güncelleme başvurularını inceleyin.</div>
+      <div className="card" style={{ padding: 16 }} className="text-muted">Aktif değişiklik başvurusu bulunmamaktadır.</div>
     </div>
   )
 }
 
-/* ── Main ────────────────────────────────────────────────────────── */
+/* ── MAIN STAFF PANEL KAPSAYICISI ───────────────────────────────── */
 const NAV = [
   { icon: 'ti-layout-dashboard', label: 'Dashboard',     view: 'dashboard' },
   { icon: 'ti-user-plus',        label: 'Create Booking',view: 'booking'   },
@@ -732,9 +362,9 @@ export default function StaffPanel({ defaultView = 'dashboard' }) {
     <div className="two-col-layout">
       <Sidebar
         navItems={NAV.map(n => ({ ...n, active: n.view === activeView, onClick: () => setActiveView(n.view) }))}
-        user={{ initials: 'AA', name: 'Ayşe A.', role: 'Clinic Staff' }}
+        user={{ initials: 'MM', name: 'Mustafa Mert Cemil', role: 'Clinic Staff' }}
       />
-      <div className="main-area">
+      <div className="main-area" style={{ overflowY: 'auto', height: '100vh', padding: 24, width: '100%' }}>
         {activeView === 'dashboard' && <StaffDashboard />}
         {activeView === 'booking'   && <AssistedBooking />}
         {activeView === 'appts'     && <AppointmentManagement />}

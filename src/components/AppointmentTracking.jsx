@@ -9,6 +9,23 @@ export default function AppointmentTracking({ patient, onNewAppointment = () => 
 
   const API_URL = 'http://localhost:4000'
 
+  // Güvenli Tarih Formatlama Fonksiyonu (ISO string'i temiz Türkçe tarihe dönüştürür)
+  const formatTurkishDate = (dateStr) => {
+    if (!dateStr) return ''
+    // Sadece YYYY-MM-DD kısmını alarak zaman dilimi (T00:00:00.000Z) karmaşasını önleriz
+    const pureDateStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
+    const [year, month, day] = pureDateStr.split('-')
+    
+    // Geçerli bir JavaScript Date objesi oluşturuyoruz (Yerel saatle)
+    const localDate = new Date(year, month - 1, day)
+    
+    return localDate.toLocaleDateString('tr-TR', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    })
+  }
+
   const loadAppointments = async () => {
     if (!patient?.id) return
     setLoading(true)
@@ -19,20 +36,30 @@ export default function AppointmentTracking({ patient, onNewAppointment = () => 
       if (!response.ok) throw new Error('Randevular yüklenemedi.')
       const appointments = await response.json()
 
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      // Bugünün tarihini sadece YYYY-MM-DD olarak string formatında alıyoruz (Zaman diliminden bağımsız)
+      const now = new Date()
+      const todayStr = now.getFullYear() + '-' + 
+                       String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                       String(now.getDate()).padStart(2, '0')
 
+      // Randevuları zaman dilimi uyuşmazlığı olmadan sadece string bazında güvenle filtreliyoruz
       const upcomingList = appointments.filter(a => {
-        const apptDate = new Date(a.date)
-        apptDate.setHours(0, 0, 0, 0)
-        return apptDate >= today
-      }).sort((a, b) => new Date(a.date) - new Date(b.date))
+        const apptDateStr = a.date.includes('T') ? a.date.split('T')[0] : a.date
+        return apptDateStr >= todayStr
+      }).sort((a, b) => {
+        const dateA = a.date.includes('T') ? a.date.split('T')[0] : a.date
+        const dateB = b.date.includes('T') ? b.date.split('T')[0] : b.date
+        return dateA.localeCompare(dateB)
+      })
 
       const pastList = appointments.filter(a => {
-        const apptDate = new Date(a.date)
-        apptDate.setHours(0, 0, 0, 0)
-        return apptDate < today
-      }).sort((a, b) => new Date(b.date) - new Date(a.date))
+        const apptDateStr = a.date.includes('T') ? a.date.split('T')[0] : a.date
+        return apptDateStr < todayStr
+      }).sort((a, b) => {
+        const dateA = a.date.includes('T') ? a.date.split('T')[0] : a.date
+        const dateB = b.date.includes('T') ? b.date.split('T')[0] : b.date
+        return dateB.localeCompare(dateA) // Geçmiş randevular en yeniden en eskiye sıralanır
+      })
 
       setUpcoming(upcomingList)
       setPast(pastList)
@@ -50,33 +77,61 @@ export default function AppointmentTracking({ patient, onNewAppointment = () => 
   const currentList = tab === 'upcoming' ? upcoming : past
 
   return (
-    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
+    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%', width: '100%', display: 'block' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h2>Randevu Takip Merkezi</h2>
           <p className="text-sm text-muted">Mevcut sağlık randevularınızı ve klinik ziyaret geçmişinizi kontrol edin.</p>
         </div>
-        <button className="btn-primary btn" onClick={onNewAppointment}><i className="ti ti-plus" /> Yeni Randevu Al</button>
+        <button 
+          className="btn-primary btn" 
+          onClick={onNewAppointment}
+          style={{ height: '36px', borderRadius: '18px', padding: '0 16px', fontSize: '13px', background: '#008069', border: 'none' }}
+        >
+          <i className="ti ti-plus" /> Yeni Randevu Al
+        </button>
       </div>
 
-      {/* Tab Navigasyon Çubuğu */}
-      <div className="flex gap-2 mb-4" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+      {/* Tab Navigasyon Alanı */}
+      <div style={{ display: 'flex', gap: 16, borderBottom: '1px solid var(--border)', marginBottom: 20, paddingBottom: 4 }}>
         <button 
-          className={`btn ${tab === 'upcoming' ? 'btn-primary' : ''}`} 
+          type="button"
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            padding: '6px 4px',
+            fontWeight: tab === 'upcoming' ? '600' : '400', 
+            color: tab === 'upcoming' ? '#008069' : '#667781', 
+            borderBottom: tab === 'upcoming' ? '3px solid #008069' : '3px solid transparent',
+            cursor: 'pointer', 
+            fontSize: '14px',
+            transition: 'all 0.15s ease'
+          }} 
           onClick={() => setTab('upcoming')}
         >
           Yaklaşan Randevular ({upcoming.length})
         </button>
         <button 
-          className={`btn ${tab === 'past' ? 'btn-primary' : ''}`} 
+          type="button"
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            padding: '6px 4px',
+            fontWeight: tab === 'past' ? '600' : '400', 
+            color: tab === 'past' ? '#008069' : '#667781', 
+            borderBottom: tab === 'past' ? '3px solid #008069' : '3px solid transparent',
+            cursor: 'pointer', 
+            fontSize: '14px',
+            transition: 'all 0.15s ease'
+          }} 
           onClick={() => setTab('past')}
         >
           Geçmiş Ziyaretler ({past.length})
         </button>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-      {loading && <div className="alert alert-info">Randevu kayıtları veritabanından doğrulanıyor...</div>}
+      {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {loading && <div className="alert alert-info" style={{ marginBottom: 12 }}>Randevu kayıtları veritabanından doğrulanıyor...</div>}
 
       {!loading && currentList.length === 0 && (
         <div className="card text-muted" style={{ padding: 30, textAlign: 'center', background: '#fff', borderRadius: 8 }}>
@@ -112,7 +167,8 @@ export default function AppointmentTracking({ patient, onNewAppointment = () => 
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontWeight: 600, color: '#008069', fontSize: 14 }}>
-                <i className="ti ti-calendar" /> {appt.date}
+                {/* ÇÖZÜM: formatTurkishDate fonksiyonu ile tarih burada temizleniyor */}
+                <i className="ti ti-calendar" /> {formatTurkishDate(appt.date)}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>
                 <i className="ti ti-clock" /> Saat: {appt.time}
