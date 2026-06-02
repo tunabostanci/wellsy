@@ -76,11 +76,11 @@ export default function DoctorDashboard({ doctor }) {
   }
 
   return (
-    <div className="screen-content" style={{ padding: 24, overflowY: 'auto', height: '100%', background: '#f4f7f6' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2>Hoş Geldiniz, {doctor.name}</h2>
-        <p className="text-sm text-muted">{doctor.specialty} • {doctor.clinic}</p>
-      </div>
+  <div className="screen-content" style={{ padding: '14px 24px', overflowY: 'auto', height: '100vh', background: '#f4f7f6', boxSizing: 'border-box', width: '100%' }}>
+    <div style={{ marginBottom: 20, borderBottom: '1px solid #eee', paddingBottom: 12 }}>
+      <h2 style={{ margin: 0, fontSize: 20, color: '#111b21' }}>Hoş Geldiniz, {doctor.name}</h2>
+      <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#667781' }}>{doctor.specialty} • {doctor.clinic}</p>
+    </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 

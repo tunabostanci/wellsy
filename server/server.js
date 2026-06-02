@@ -125,6 +125,35 @@ app.get('/api/patients', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.put('/api/patients/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, phone, password } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'İsim alanı boş bırakılamaz.' });
+  }
+
+  try {
+    // Veritabanında ilgili hastanın bilgilerini update ediyoruz
+    const result = await pool.query(
+      `UPDATE patients 
+       SET name = $1, phone = $2, password = COALESCE($3, password)
+       WHERE id = $4 
+       RETURNING id, name, tc, email, phone, role`,
+      [name.trim(), phone ? phone.trim() : null, password ? password : null, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+    }
+
+    // Güncellenmiş yeni kullanıcı objesini ön yüze geri dönüyoruz
+    res.json({ success: true, user: result.rows[0] });
+  } catch (err) {
+    console.error("Profil Güncelleme Hatası:", err);
+    res.status(500).json({ error: 'Profil bilgileri güncellenirken bir hata oluştu.' });
+  }
+});
 
 // 1. TÜM RANDEVULARI APPOINTMENTS TABLOSUNDAN CANLI LİSTELEME (STAFF İÇİN)
 app.get('/api/admin/all-appointments', async (req, res) => {

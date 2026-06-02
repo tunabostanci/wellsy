@@ -7,15 +7,19 @@ import AppointmentBookingGrid from './components/AppointmentBookingGrid.jsx'
 import DoctorDashboard from './components/DoctorDashboard.jsx'
 import StaffPanel from './components/StaffPanel.jsx'
 import AdminPanel from './components/AdminPanel.jsx'
+import PatientProfile from './components/PatientProfile.jsx' 
+import Sidebar from './components/Sidebar.jsx' 
 
 export default function App() {
   const [user, setUser] = useState(null)
-  const [active, setActive] = useState('chatbot') // 'chatbot' | 'doctors' | 'booking-grid' | 'appts'
-  const [selectedDoctor, setSelectedDoctor] = useState(null) // Seçilen doktor hafızası
+  const [active, setActive] = useState('chatbot') // 'chatbot' | 'doctors' | 'profile' | 'booking-grid' | 'appts'
+  const [selectedDoctor, setSelectedDoctor] = useState(null)
   const [staffDefaultView, setStaffDefaultView] = useState('dashboard')
-  
-  // Chatbot konuşma geçmişini hafızada tutup DoctorListing'e paslayacak olan köprü state
   const [aiChatHistory, setAiChatHistory] = useState('')
+
+  const handleUserUpdate = (updatedUser) => {
+    setUser(updatedUser); 
+  };
 
   const handleLoginSuccess = (userData) => {
     setUser(userData)
@@ -30,60 +34,94 @@ export default function App() {
     setUser(null)
     setActive('chatbot')
     setSelectedDoctor(null)
-    setAiChatHistory('') // Oturum kapatılınca AI geçmişini de temizliyoruz
+    setAiChatHistory('')
   }
 
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />
   }
 
-  // DOCTOR MODÜLÜ
+  const getUserInitials = (name) => {
+    if (!name) return 'US';
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // A) DOCTOR MODÜLÜ
+  // ─────────────────────────────────────────────────────────────────────────
   if (user.role === 'doctor') {
+    const doctorNav = [
+      { icon: 'ti-dashboard', label: 'Doctor Dashboard', active: true },
+      { icon: 'ti-logout', label: 'Logout', onClick: handleLogout }
+    ];
+
     return (
-      <div className="app-shell">
-        <nav className="tab-bar" role="tablist">
-          <button role="tab" className="tab-btn active" style={{ flex: 1 }}>Doctor Dashboard</button>
-          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>Logout</button>
-        </nav>
-        <div className="screen-content"><DoctorDashboard doctor={user} /></div>
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+        <Sidebar 
+          logo="Wellsy" 
+          navItems={doctorNav} 
+          user={{ initials: getUserInitials(user.name), name: user.name, role: 'Uzman Doktor' }} 
+        />
+        <div style={{ flex: 1, height: '100vh', overflowY: 'auto', background: '#f4f7f6', boxSizing: 'border-box' }}>
+          <DoctorDashboard doctor={user} />
+        </div>
       </div>
     )
   }
 
-  // PATIENT MODÜLÜ
+  // ─────────────────────────────────────────────────────────────────────────
+  // B) PATIENT MODÜLÜ (SIDEBAR & PANORAMİK ROW ENTEGRASYONU)
+  // ─────────────────────────────────────────────────────────────────────────
   if (user.role === 'Patient' || user.role === 'patient') {
-    const PATIENT_TABS = [
-      { id: 'chatbot', label: 'Chatbot', icon: 'ti-message-chatbot' },
-      { id: 'doctors', label: 'Choose Doctor', icon: 'ti-stethoscope' },
-      { id: 'appts', label: 'My Appointments', icon: 'ti-calendar' },
-    ]
+    
+    const PATIENT_NAV_ITEMS = [
+      { 
+        icon: 'ti-message-chatbot', 
+        label: 'Chatbot Asistanı', 
+        active: active === 'chatbot', 
+        onClick: () => setActive('chatbot') 
+      },
+      { 
+        icon: 'ti-stethoscope', 
+        label: 'Doktor Seçimi', 
+        active: active === 'doctors' || active === 'booking-grid', 
+        onClick: () => setActive('doctors') 
+      },
+      { 
+        icon: 'ti-calendar', 
+        label: 'Randevularım', 
+        active: active === 'appts', 
+        onClick: () => setActive('appts') 
+      },
+      { 
+        icon: 'ti-user-cog', 
+        label: 'Profil Ayarları', 
+        active: active === 'profile', 
+        onClick: () => setActive('profile') 
+      },
+      { 
+        icon: 'ti-logout', 
+        label: 'Güvenli Çıkış', 
+        onClick: handleLogout 
+      }
+    ];
 
     return (
-      <div className="app-shell">
-        <nav className="tab-bar" role="tablist" aria-label="Patient views">
-          {PATIENT_TABS.map(t => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={active === t.id || (t.id === 'doctors' && active === 'booking-grid')}
-              className={`tab-btn${active === t.id || (t.id === 'doctors' && active === 'booking-grid') ? ' active' : ''}`}
-              onClick={() => {
-                // Eğer sekmelerden doğrudan "Choose Doctor"a tıklarsa ve chatbot geçmişi yoksa düz liste gelsin diye temizlenebilir, 
-                // ancak chatbot'tan yönlendirmeyle gelindiğinde korunması için dokunmuyoruz.
-                setActive(t.id)
-              }}
-            >
-              <i className={`ti ${t.icon}`} aria-hidden="true" /> {t.label}
-            </button>
-          ))}
-          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ marginLeft: 'auto' }}>
-            <i className="ti ti-logout" aria-hidden="true" /> Logout
-          </button>
-        </nav>
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+        {/* Reusable Sidebar */}
+        <Sidebar 
+          logo="Wellsy" 
+          navItems={PATIENT_NAV_ITEMS} 
+          user={{ 
+            initials: getUserInitials(user.name), 
+            name: user.name, 
+            role: 'Kayıtlı Hasta' 
+          }} 
+        />
 
-        <div className="screen-content">
+        {/* Ana İçerik Ekranı - Sidebar'ın sağında izole şekilde listelenir */}
+        <div style={{ flex: 1, height: '100vh', overflowY: 'auto', background: '#f4f7f6', boxSizing: 'border-box' }}>
           {active === 'chatbot' && (
-            // Chatbot'tan gelen metin dökümünü yakalayıp state'e yazıyoruz ve ekranı kaydırıyoruz
             <PatientChatbot 
               onNavigateToDoctors={(historySummary) => {
                 setAiChatHistory(historySummary)
@@ -93,12 +131,18 @@ export default function App() {
           )}
           {active === 'doctors' && (
             <DoctorListing
-              chatHistory={aiChatHistory} // Yakalanan canlı AI geçmişini prop olarak gönderiyoruz
+              chatHistory={aiChatHistory}
               onBack={() => setActive('chatbot')}
               onContinue={(doctor) => {
                 setSelectedDoctor(doctor) 
                 setActive('booking-grid') 
               }}
+            />
+          )}
+          {active === 'profile' && (
+            <PatientProfile 
+              user={user} 
+              onUserUpdate={handleUserUpdate} 
             />
           )}
           {active === 'booking-grid' && (
@@ -108,7 +152,7 @@ export default function App() {
               chatHistory={aiChatHistory}
               onBack={() => setActive('doctors')}
               onBookingComplete={() => {
-                setAiChatHistory('') // Randevu başarıyla tamamlandığında AI geçmişini sıfırlıyoruz
+                setAiChatHistory('') 
                 setActive('appts')
               }} 
             />
@@ -119,7 +163,6 @@ export default function App() {
               onNewAppointment={() => setActive('doctors')}
               onChatbot={() => setActive('chatbot')}
               onChooseDoctor={() => setActive('doctors')}
-              onProfile={() => {}}
             />
           )}
         </div>
@@ -127,31 +170,94 @@ export default function App() {
     )
   }
 
-  // STAFF MODÜLÜ
+ // ─────────────────────────────────────────────────────────────────────────
+  // C) STAFF MODÜLÜ (ONAYLAMA EKRANI VE PROFİL AYARLARI ENTREGRE SÜRÜM)
+  // ─────────────────────────────────────────────────────────────────────────
   if (user.role === 'Staff' || user.role === 'staff') {
+    const staffNav = [
+      { 
+        icon: 'ti-layout-dashboard', 
+        label: 'Dashboard', 
+        active: staffDefaultView === 'dashboard', 
+        onClick: () => setStaffDefaultView('dashboard') 
+      },
+      { 
+        icon: 'ti-user-plus', 
+        label: 'Create Booking', 
+        active: staffDefaultView === 'booking', 
+        onClick: () => setStaffDefaultView('booking') 
+      },
+      { 
+        icon: 'ti-calendar', 
+        label: 'Appointments', 
+        active: staffDefaultView === 'appts', 
+        onClick: () => setStaffDefaultView('appts') // FIXED: Sidebar ile StaffPanel 'appts' ismi eşitlendi!
+      },
+      { 
+        icon: 'ti-refresh-alert', 
+        label: 'Change Requests', 
+        active: staffDefaultView === 'changes', 
+        onClick: () => setStaffDefaultView('changes') 
+      },
+      { 
+        icon: 'ti-user-cog', 
+        label: 'Profil Ayarları', 
+        active: staffDefaultView === 'profile', 
+        onClick: () => setStaffDefaultView('profile') 
+      },
+      { 
+        icon: 'ti-logout', 
+        label: 'Güvenli Çıkış', 
+        onClick: handleLogout 
+      }
+    ];
+
     return (
-      <div className="app-shell">
-        <nav className="tab-bar" role="tablist">
-          <button role="tab" className="tab-btn active" style={{ flex: 1 }}>Clinic Staff</button>
-          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>Logout</button>
-        </nav>
-        <div className="screen-content"><StaffPanel defaultView={staffDefaultView} /></div>
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+        <Sidebar 
+          logo="Wellsy" 
+          navItems={staffNav} 
+          user={{ 
+            initials: getUserInitials(user.name), 
+            name: user.name, 
+            role: 'Klinik Personeli' 
+          }} 
+        />
+        <div style={{ flex: 1, height: '100vh', overflowY: 'auto', background: '#f4f7f6', boxSizing: 'border-box', padding: '10px' }}>
+          <StaffPanel defaultView={staffDefaultView} user={user} onUserUpdate={handleUserUpdate} />
+        </div>
       </div>
     )
   }
 
-  // ADMIN MODÜLÜ
+  // ─────────────────────────────────────────────────────────────────────────
+  // D) ADMIN MODÜLÜ (SIFIR HATA - SIDEBAR ENTEGRE SÜRÜM)
+  // ─────────────────────────────────────────────────────────────────────────
   if (user.role === 'Admin' || user.role === 'admin') {
+    const adminNav = [
+      { icon: 'ti-shield-lock', label: 'Yönetici Paneli', active: true },
+      { icon: 'ti-logout', label: 'Güvenli Çıkış', onClick: handleLogout }
+    ];
+
     return (
-      <div className="app-shell">
-        <nav className="tab-bar" role="tablist">
-          <button role="tab" className="tab-btn active" style={{ flex: 1 }}>Admin Panel</button>
-          <button role="tab" className="tab-btn" onClick={handleLogout} style={{ flex: 1 }}>Logout</button>
-        </nav>
-        <div className="screen-content"><AdminPanel /></div>
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+        <Sidebar 
+          logo="Wellsy" 
+          badge="ADMIN" 
+          dark={true} // Yönetici ağırlığı için koyu gri tema
+          navItems={adminNav} 
+          user={{ 
+            initials: 'AD', 
+            name: user.name, 
+            role: 'Sistem Yöneticisi' 
+          }} 
+        />
+        {/* Sağ İçerik Alanı: padding verilerek üste binme engellendi */}
+        <div style={{ flex: 1, height: '100vh', overflowY: 'auto', background: '#f4f7f6', boxSizing: 'border-box', padding: '10px' }}>
+          <AdminPanel />
+        </div>
       </div>
     )
   }
-
   return null
 }

@@ -1,12 +1,4 @@
 import { useEffect, useState } from 'react'
-import Sidebar from './Sidebar.jsx'
-
-const ADMIN_NAV = [
-  { icon: 'ti-layout-dashboard', label: 'Overview', view: 'overview' },
-  { icon: 'ti-user-plus', label: 'Create Account', view: 'create-account' }, // Sadece admin hesap açabilir
-  { icon: 'ti-stethoscope', label: 'Doctors Network', view: 'doctors' },
-  { icon: 'ti-user-heart', label: 'Patients Directory', view: 'patients' },
-]
 
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState('overview')
@@ -16,8 +8,8 @@ export default function AdminPanel() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Form State Değişkenleri
-  const [accType, setAccType] = useState('doctor') // doctor | staff | admin
+  // Form States
+  const [accType, setAccType] = useState('doctor') 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -42,7 +34,6 @@ export default function AdminPanel() {
 
   useEffect(() => { fetchData() }, [])
 
-  // Hesap Oluşturma Tetikleyicisi
   const handleCreateAccount = async (e) => {
     e.preventDefault()
     setError(''); setSuccess('')
@@ -71,7 +62,7 @@ export default function AdminPanel() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Hesap oluşturulamadı.')
 
-      setSuccess(`Şifreli ${accType} hesabı başarıyla veritabanına işlendi!`)
+      setSuccess(`Şifreli yeni ${accType} yetkilisi başarıyla sisteme işlendi!`)
       setName(''); setEmail(''); setPassword(''); setSpecialty(''); setClinic('')
       fetchData()
     } catch (err) {
@@ -80,81 +71,109 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="two-col-layout">
-      <Sidebar
-        navItems={ADMIN_NAV.map(item => ({
-          ...item,
-          active: item.view === activeSection,
-          onClick: () => { setActiveSection(item.view); setError(''); setSuccess('') },
-        }))}
-        user={{ initials: 'AD', name: 'Sistem Yöneticisi', role: 'Admin' }}
-      />
-      <div className="main-area" style={{ overflowY: 'auto', height: '100vh', padding: 24 }}>
-        {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-info" style={{ background: '#E1F5EE', color: '#0F6E56' }}>{success}</div>}
+    <div style={{ padding: '14px 24px', width: '100%', boxSizing: 'border-box' }}>
+      
+      {/* Üst Sekme Navigasyonu (Admin Alt Menüsü Olarak Kullanışlı Hale Getirildi) */}
+      <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid #eee', marginBottom: 20, paddingBottom: 8 }}>
+        {[
+          { id: 'overview', label: 'Sistem Özeti', icon: 'ti-chart-bar' },
+          { id: 'create-account', label: 'Yeni Yetkili Tanımla', icon: 'ti-user-plus' },
+          { id: 'doctors', label: 'Doktor Networkü', icon: 'ti-stethoscope' },
+          { id: 'patients', label: 'Hasta & Personel Rehberi', icon: 'ti-address-book' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => { setActiveSection(tab.id); setError(''); setSuccess('') }}
+            style={{
+              padding: '6px 14px', background: activeSection === tab.id ? '#2C2C2A' : 'transparent',
+              color: activeSection === tab.id ? '#fff' : '#667781', border: 'none',
+              borderRadius: '16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+            }}
+          >
+            <i className={`ti ${tab.icon}`} /> {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {activeSection === 'overview' && (
-          <div>
-            <h3>Sistem Özeti</h3>
-            <div className="metrics-grid" style={{ display: 'flex', gap: 14, marginTop: 14 }}>
-              <div className="metric-card" style={{ padding: 20, background: 'white', flex: 1, borderRadius: 8 }}>
-                <div className="metric-label">Aktif Doktor Sayısı</div>
-                <div className="metric-val">{doctors.length}</div>
-              </div>
-              <div className="metric-card" style={{ padding: 20, background: 'white', flex: 1, borderRadius: 8 }}>
-                <div className="metric-label">Kayıtlı Kullanıcı/Hasta</div>
-                <div className="metric-val">{patients.length}</div>
-              </div>
+      {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {success && <div className="alert alert-info" style={{ background: '#E1F5EE', color: '#0F6E56', marginBottom: 12 }}>{success}</div>}
+
+      {/* SUB-VIEWS */}
+      {activeSection === 'overview' && (
+        <div>
+          <h3 style={{ fontSize: 17, marginBottom: 12 }}>Sistem Kaynak Özeti</h3>
+          <div className="metrics-grid" style={{ display: 'flex', gap: 16 }}>
+            <div className="metric-card" style={{ padding: 20, background: 'white', flex: 1, borderRadius: 12, border: '1px solid #e9edef' }}>
+              <div style={{ fontSize: 13, color: '#667781' }}>Aktif Uzman Doktor Sayısı</div>
+              <div style={{ fontSize: 24, fontWeight: '600', marginTop: 8, color: '#2C2C2A' }}>{loading ? '...' : doctors.length}</div>
+            </div>
+            <div className="metric-card" style={{ padding: 20, background: 'white', flex: 1, borderRadius: 12, border: '1px solid #e9edef' }}>
+              <div style={{ fontSize: 13, color: '#667781' }}>Kayıtlı Toplam Kullanıcı</div>
+              <div style={{ fontSize: 24, fontWeight: '600', marginTop: 8, color: '#2C2C2A' }}>{loading ? '...' : patients.length}</div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ADMIN ÖZEL: HESAP OLUŞTURMA PANELİ */}
-        {activeSection === 'create-account' && (
-          <div className="card" style={{ padding: 24, maxWidth: 500, background: 'white', borderRadius: 8 }}>
-            <h4>Yeni Yetkili Hesabı Tanımla</h4>
-            <p className="text-sm text-muted">Sadece admin rolü yeni doktor, staff veya admin oluşturma yetkisine sahiptir.</p>
-            
-            <form onSubmit={handleCreateAccount} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 500 }}>Hesap Tipi</label>
-                <select className="text-input" style={{ width: '100%' }} value={accType} onChange={e => setAccType(e.target.value)}>
-                  <option value="doctor">Doktor (Doctor)</option>
-                  <option value="Staff">Klinik Personeli (Staff)</option>
-                  <option value="admin">Sistem Yöneticisi (Admin)</option>
-                </select>
+      {activeSection === 'create-account' && (
+        <div className="card" style={{ padding: 24, maxWidth: 500, background: 'white', borderRadius: 12, border: '1px solid #e9edef' }}>
+          <h4 style={{ margin: 0 }}>Yeni Sistem Yetkilisi Tanımla</h4>
+          <p className="text-sm text-muted" style={{ marginBottom: 16 }}>Sadece yönetici rolü yeni doktor veya personel atama yetkisine sahiptir.</p>
+          
+          <form onSubmit={handleCreateAccount} style={{ display: 'grid', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#111b21', display: 'block', marginBottom: 4 }}>Hesap Yetki Türü</label>
+              <select className="text-input" style={{ width: '100%', height: 38, borderRadius: 8 }} value={accType} onChange={e => setAccType(e.target.value)}>
+                <option value="doctor">Doktor (Doctor)</option>
+                <option value="Staff">Klinik Personeli (Staff)</option>
+                <option value="admin">Sistem Yöneticisi (Admin)</option>
+              </select>
+            </div>
+
+            <input type="text" className="text-input" style={{ height: 38, borderRadius: 8 }} placeholder="Adı Soyadı" value={name} onChange={e => setName(e.target.value)} required />
+            <input type="email" className="text-input" style={{ height: 38, borderRadius: 8 }} placeholder="E-posta Adresi" value={email} onChange={e => setEmail(e.target.value)} required />
+            <input type="password" className="text-input" style={{ height: 38, borderRadius: 8 }} placeholder="Sistem Giriş Şifresi" value={password} onChange={e => setPassword(e.target.value)} required />
+
+            {accType === 'doctor' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <input type="text" className="text-input" style={{ height: 38, borderRadius: 8 }} placeholder="Branş / Uzmanlık" value={specialty} onChange={e => setSpecialty(e.target.value)} />
+                <input type="text" className="text-input" style={{ height: 38, borderRadius: 8 }} placeholder="Atanacağı Klinik" value={clinic} onChange={e => setClinic(e.target.value)} />
               </div>
+            )}
 
-              <input type="text" className="text-input" placeholder="Ad Soyad" value={name} onChange={e => setName(e.target.value)} required />
-              <input type="email" className="text-input" placeholder="E-posta Adresi" value={email} onChange={e => setEmail(e.target.value)} required />
-              <input type="password" className="text-input" placeholder="Güvenli Şifre" value={password} onChange={e => setPassword(e.target.value)} required />
+            <button type="submit" className="btn-primary btn" style={{ height: 40, background: '#2C2C2A', border: 'none', borderRadius: 20, cursor: 'pointer', marginTop: 6 }}>Sistem Hesabını Veritabanına İşle</button>
+          </form>
+        </div>
+      )}
 
-              {accType === 'doctor' && (
-                <>
-                  <input type="text" className="text-input" placeholder="Uzmanlık Alanı (Branş)" value={specialty} onChange={e => setSpecialty(e.target.value)} />
-                  <input type="text" className="text-input" placeholder="Klinik Adı" value={clinic} onChange={e => setClinic(e.target.value)} />
-                </>
-              )}
+      {activeSection === 'doctors' && (
+        <div className="card" style={{ padding: 20, background: 'white', borderRadius: 12 }}>
+          <h4 style={{ marginBottom: 12 }}>Kayıtlı Doktorlar Listesi</h4>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {doctors.map((d, i) => (
+              <li key={i} style={{ padding: '10px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
+                <i className="ti ti-stethoscope" style={{ color: '#667781', marginRight: 8 }} />
+                <strong style={{ color: '#111b21' }}>{d.name}</strong> — {d.specialty} <span style={{ color: '#667781' }}>({d.email})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-              <button type="submit" className="btn-primary btn" style={{ marginTop: 10 }}>Sistem Hesabını Oluştur</button>
-            </form>
-          </div>
-        )}
-
-        {activeSection === 'doctors' && (
-          <div className="card" style={{ padding: 16, background: 'white' }}>
-            <h4>Kayıtlı Doktorlar Listesi</h4>
-            <ul>{doctors.map((d, i) => <li key={i} style={{ padding: '6px 0', borderBottom: '1px solid #eee' }}><strong>{d.name}</strong> - {d.specialty} ({d.email})</li>)}</ul>
-          </div>
-        )}
-
-        {activeSection === 'patients' && (
-          <div className="card" style={{ padding: 16, background: 'white' }}>
-            <h4>Kayıtlı Hastalar ve Personeller</h4>
-            <ul>{patients.map((p, i) => <li key={i} style={{ padding: '6px 0', borderBottom: '1px solid #eee' }}><strong>{p.name}</strong> - Rol: <span className="badge">{p.role}</span> ({p.email})</li>)}</ul>
-          </div>
-        )}
-      </div>
+      {activeSection === 'patients' && (
+        <div className="card" style={{ padding: 20, background: 'white', borderRadius: 12 }}>
+          <h4 style={{ marginBottom: 12 }}>Kayıtlı Sistem Kullanıcıları</h4>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {patients.map((p, i) => (
+              <li key={i} style={{ padding: '10px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
+                <i className="ti ti-user" style={{ color: '#667781', marginRight: 8 }} />
+                <strong style={{ color: '#111b21' }}>{p.name}</strong> — Rol: <span className="badge" style={{ background: '#e1f5ee', color: '#0f6e56', padding: '2px 6px', borderRadius: '4px', fontSize: 11 }}>{p.role}</span> <span style={{ color: '#667781' }}>({p.email})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
