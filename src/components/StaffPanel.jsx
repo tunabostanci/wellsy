@@ -12,25 +12,79 @@ const PATIENTS = [
 const BRANCHES = ['Clinical Psychologist', 'Psychiatrist', 'Neurology', 'Internal Medicine']
 const SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
 
-/* ── 1. DASHBOARD SUB-VIEW ──────────────────────────────────────── */
+/* ── 1. DASHBOARD SUB-VIEW (DİNAMİK METRİKLER AKTİF) ──────────────────────────────── */
 function StaffDashboard() {
+  const [totalAppointments, setTotalAppointments] = useState(0)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [cancellationCount, setCancellationCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Dashboard metriklerini canlı olarak beslemek için backend'den tüm randevuları ve talepleri sorguluyoruz
+    const loadDashboardMetrics = async () => {
+      try {
+        setLoading(true)
+        
+        // 1. Tüm randevuları çekip toplam sayıyı buluyoruz
+        const apptsRes = await fetch(`${API_URL}/api/admin/all-appointments`)
+        if (apptsRes.ok) {
+          const apptsData = await apptsRes.json()
+          setTotalAppointments(apptsData.length)
+          
+          // Durumu 'Pending' olan onay bekleyen randevuların sayısını hesapla
+          const pending = apptsData.filter(a => a.status?.toLowerCase() === 'pending').length
+          setPendingCount(pending)
+        }
+
+        // 2. İptal istekleri sekmesini besleyen endpoint'ten aktif iptal talebi sayısını çekiyoruz
+        const changesRes = await fetch(`${API_URL}/api/admin/change-requests`)
+        if (changesRes.ok) {
+          const changesData = await changesRes.json()
+          setCancellationCount(changesData.length)
+        }
+
+      } catch (err) {
+        console.error("Dashboard metrikleri yüklenirken hata oluştu:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboardMetrics()
+  }, [])
+
   return (
     <div>
       <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>Staff Panel</div>
       <div className="text-sm text-muted mb-4">Klinik günlük operasyon ve randevu takip paneli.</div>
 
-      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 20 }}>
+      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
         {[
-          { label: "Bugünün Klinik İşlemleri", val: '12', icon: 'ti-users',           color: 'var(--teal)' },
-          { label: 'Onay Bekleyen Talepler',        val: 'Önizleme',  icon: 'ti-clock',           color: 'var(--amber-text)' },
-          { label: 'Değişiklik İstekleri',             val: 'Canlı',  icon: 'ti-refresh-alert',   color: 'var(--blue-text)' },
+          { 
+            label: "Toplam Klinik Randevusu", 
+            val: loading ? "..." : totalAppointments, 
+            icon: 'ti-users', 
+            color: 'var(--teal)' 
+          },
+          { 
+            label: 'Onay Bekleyen Talepler', 
+            val: loading ? "..." : `${pendingCount} Randevu`, 
+            icon: 'ti-clock', 
+            color: '#854F0B' 
+          },
+          { 
+            label: 'İptal / Değişiklik İstekleri', 
+            val: loading ? "..." : `${cancellationCount} Talep`, 
+            icon: 'ti-refresh-alert', 
+            color: '#d9383a' 
+          },
         ].map((m, i) => (
-          <div key={i} className="metric-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div className="metric-label">{m.label}</div>
-              <i className={`ti ${m.icon}`} style={{ color: m.color, fontSize: 18 }} />
+          <div key={i} className="metric-card" style={{ padding: 16, background: 'white', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="metric-label" style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>{m.label}</div>
+              <i className={`ti ${m.icon}`} style={{ color: m.color, fontSize: 20 }} />
             </div>
-            <div className="metric-val">{m.val}</div>
+            <div className="metric-val" style={{ fontSize: 22, fontWeight: 600, marginTop: 10, color: '#111b21' }}>{m.val}</div>
           </div>
         ))}
       </div>

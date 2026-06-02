@@ -2,12 +2,14 @@ import express from 'express'
 import cors from 'cors'
 import { config } from 'dotenv'
 import pg from 'pg'
+import nodemailer from 'nodemailer'
+import { Resend } from 'resend';
 
 config()
 
 const { Pool } = pg
 const PORT = process.env.PORT || 4000
-
+const resend = new Resend('re_ZcT1hGTh_Dx4EgCPxXK7c95BFpjiFDYTP');
 // Orijinal veritabanı bağlantı havuzunuz
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@db:5432/wellsy_db'
@@ -149,14 +151,104 @@ app.get('/api/admin/all-appointments', async (req, res) => {
   }
 });
 
-// 2. PERSONELİN RANDEVU DURUMUNU GÜNCELLEMESİ (APPROVE/REJECT)
+
+// =========================================================================
+// 2. PERSONELİN RANDEVU DURUMUNU GÜNCELLEMESİ (APPROVE/REJECT - RESEND SÜRÜMÜ)
+// =========================================================================
 app.put('/api/appointments/:id/status', async (req, res) => {
   const { status } = req.body;
   const { id } = req.params;
+
   try {
+    // 1. Randevunun durumunu veritabanında güncelle
     await pool.query('UPDATE appointments SET status = $1 WHERE id = $2', [status, id]);
-    res.json({ success: true });
+
+    // 2. Eğer personel randevuyu 'Confirmed' yaptıysa gerçek maili uçur
+    if (status === 'Confirmed') {
+      
+      // Mail içeriği için veritabanından gerekli bilgileri çekiyoruz
+      const apptDetails = await pool.query(`
+        SELECT 
+          p.email as patient_email, 
+          p.name as patient_name,
+          d.name as doctor_name, 
+          TO_CHAR(a.appointment_date, 'YYYY-MM-DD') as date, 
+          a.appointment_time as time,
+          d.clinic
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.id = $1
+      `, [id]);
+
+      if (apptDetails.rowCount > 0) {
+        const { patient_name, doctor_name, date, time, clinic } = apptDetails.rows[0];
+
+        // 3. Resend üzerinden maili asenkron olarak tetikliyoruz
+        // Kural: Ücretsiz sandbox modunda 'from' alanı sadece onboarding@resend.dev olabilir.
+        resend.emails.send({
+          from: 'Wellsy Sağlık <onboarding@resend.dev>',
+          to: 'tunabostanci2005@gmail.com', // Alıcı: Hasta
+          subject: '🏥 Randevunuz Onaylandı! - Wellsy Sağlık',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e9edef; border-radius: 12px;">
+              <h2 style="color: #008069; border-bottom: 2px solid #008069; padding-bottom: 10px; margin-top: 0;">Wellsy Randevu Onay Belgesi</h2>
+              <p>Merhaba Sayın <strong>${patient_name}</strong>,</p>
+              <p>Klinik asistanlarımız tarafından yapılan inceleme sonucunda randevu talebiniz başarıyla <strong>onaylanmıştır</strong>. Detaylar aşağıda yer almaktadır:</p>
+              
+              <div style="background-color: #E1F5EE; padding: 15px; border-radius: 8px; margin: 20px 0; color: #0F6E56;">
+                <h4 style="margin-top: 0; color: #0F6E56; font-size: 15px;">Randevu Bilgileriniz:</h4>
+                <ul style="list-style: none; padding-left: 0; line-height: 1.8; margin-bottom: 0;">
+                  <li><strong>Uzman Doktor:</strong> ${doctor_name}</li>
+                  <li><strong>Klinik / Branş:</strong> ${clinic}</li>
+                  <li><strong>Tarih:</strong> ${date}</li>
+                  <li><strong>Saat Dilimi:</strong> ${time}</li>
+                </ul>
+              </div>
+              
+              <p style="font-size: 13px; color: #667781;">Randevu saatinizde sisteme giriş yaparak online görüşme odanıza katılabilirsiniz. Geçmiş olsun dileriz.</p>
+              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+              <p style="font-size: 11px; color: #999; text-align: center; margin-bottom: 0;">Bu e-posta Wellsy AI asistan otomasyonu tarafından gönderilmiştir.</p>
+            </div>
+          `
+        }).then(() => console.log("✨ HASTA MAİLİ BAŞARIYLA GÖNDERİLDİ (tunabostanci2005@gmail.com)"))
+          .catch(err => console.error("Hasta mail hatası:", err));
+
+
+        // ── B) DOKTORA ÖZEL MAİL (tunabostanci2005@gmail.com) ────────────────────
+        resend.emails.send({
+          from: 'Wellsy Klinik Bilgi <onboarding@resend.dev>',
+          to: 'tunabostanci2005@gmail.com', // Alıcı: Doktor
+          subject: `📅 Yeni Randevu Ataması: ${patient_name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e9edef; border-radius: 12px; border-top: 4px solid #854F0B;">
+              <h2 style="color: #854F0B; border-bottom: 2px solid #854F0B; padding-bottom: 10px; margin-top: 0;">Sayın ${doctor_name}, Yeni Randevunuz Var</h2>
+              <p>Klinik yönetim merkezi tarafından panelinize yeni bir hasta ziyareti başarıyla atanmış ve onaylanmıştır.</p>
+              
+              <div style="background-color: #FFF3CD; padding: 15px; border-radius: 8px; margin: 20px 0; color: #854F0B;">
+                <h4 style="margin-top: 0; color: #854F0B; font-size: 15px;">Hasta ve Seans Detayları:</h4>
+                <ul style="list-style: none; padding-left: 0; line-height: 1.8; margin-bottom: 0;">
+                  <li><strong>Hasta Adı:</strong> ${patient_name}</li>
+                  <li><strong>Tarih:</strong> ${date}</li>
+                  <li><strong>Saat Dilimi:</strong> ${time}</li>
+                  <li><strong>Klinik Alanı:</strong> ${clinic}</li>
+                </ul>
+              </div>
+              
+              <p style="font-size: 13px; color: #667781;"><strong>Klinik Aksiyon Maddesi:</strong> Lütfen seans öncesinde doktor panelinize giriş yaparak hastanın yapay zeka triyaj asistanı (Symptom Checker) ile yaptığı konuşma özetini ve tıbbi geçmişini inceleyiniz.</p>
+              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+              <p style="font-size: 11px; color: #999; text-align: center; margin-bottom: 0;">Wellsy Entegre Hastane Bilgi Yönetim Sistemi (HBYS)</p>
+            </div>
+          `
+        }).then(() => console.log("✨ DOKTOR MAİLİ BAŞARIYLA GÖNDERİLDİ (tunabostanci2005@gmail.com)"))
+          .catch(err => console.error("Doktor mail hatası:", err));
+
+      }
+    }
+
+    res.json({ success: true, message: 'Durum güncellendi ve Resend maili arka planda tetiklendi.' });
   } catch (err) {
+    console.error("Sistem Hatası:", err);
     res.status(500).json({ error: err.message });
   }
 });

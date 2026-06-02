@@ -3,7 +3,7 @@ import Login from './components/Login.jsx'
 import PatientChatbot from './components/PatientChatbot.jsx'
 import DoctorListing from './components/DoctorListing.jsx'
 import AppointmentTracking from './components/AppointmentTracking.jsx'
-import AppointmentBookingGrid from './components/AppointmentBookingGrid.jsx' // Yeni eklenen dosyamız
+import AppointmentBookingGrid from './components/AppointmentBookingGrid.jsx'
 import DoctorDashboard from './components/DoctorDashboard.jsx'
 import StaffPanel from './components/StaffPanel.jsx'
 import AdminPanel from './components/AdminPanel.jsx'
@@ -13,6 +13,9 @@ export default function App() {
   const [active, setActive] = useState('chatbot') // 'chatbot' | 'doctors' | 'booking-grid' | 'appts'
   const [selectedDoctor, setSelectedDoctor] = useState(null) // Seçilen doktor hafızası
   const [staffDefaultView, setStaffDefaultView] = useState('dashboard')
+  
+  // Chatbot konuşma geçmişini hafızada tutup DoctorListing'e paslayacak olan köprü state
+  const [aiChatHistory, setAiChatHistory] = useState('')
 
   const handleLoginSuccess = (userData) => {
     setUser(userData)
@@ -27,6 +30,7 @@ export default function App() {
     setUser(null)
     setActive('chatbot')
     setSelectedDoctor(null)
+    setAiChatHistory('') // Oturum kapatılınca AI geçmişini de temizliyoruz
   }
 
   if (!user) {
@@ -46,7 +50,7 @@ export default function App() {
     )
   }
 
-  // PATIENT MODÜLÜ (Yeni Saat Akışı Entegre Edildi)
+  // PATIENT MODÜLÜ
   if (user.role === 'Patient' || user.role === 'patient') {
     const PATIENT_TABS = [
       { id: 'chatbot', label: 'Chatbot', icon: 'ti-message-chatbot' },
@@ -63,7 +67,11 @@ export default function App() {
               role="tab"
               aria-selected={active === t.id || (t.id === 'doctors' && active === 'booking-grid')}
               className={`tab-btn${active === t.id || (t.id === 'doctors' && active === 'booking-grid') ? ' active' : ''}`}
-              onClick={() => setActive(t.id)}
+              onClick={() => {
+                // Eğer sekmelerden doğrudan "Choose Doctor"a tıklarsa ve chatbot geçmişi yoksa düz liste gelsin diye temizlenebilir, 
+                // ancak chatbot'tan yönlendirmeyle gelindiğinde korunması için dokunmuyoruz.
+                setActive(t.id)
+              }}
             >
               <i className={`ti ${t.icon}`} aria-hidden="true" /> {t.label}
             </button>
@@ -75,14 +83,21 @@ export default function App() {
 
         <div className="screen-content">
           {active === 'chatbot' && (
-            <PatientChatbot onNavigateToDoctors={() => setActive('doctors')} />
+            // Chatbot'tan gelen metin dökümünü yakalayıp state'e yazıyoruz ve ekranı kaydırıyoruz
+            <PatientChatbot 
+              onNavigateToDoctors={(historySummary) => {
+                setAiChatHistory(historySummary)
+                setActive('doctors')
+              }} 
+            />
           )}
           {active === 'doctors' && (
             <DoctorListing
+              chatHistory={aiChatHistory} // Yakalanan canlı AI geçmişini prop olarak gönderiyoruz
               onBack={() => setActive('chatbot')}
               onContinue={(doctor) => {
-                setSelectedDoctor(doctor) // Seçilen doktoru hafızaya al
-                setActive('booking-grid') // Saat seçme ekranına fırlat
+                setSelectedDoctor(doctor) 
+                setActive('booking-grid') 
               }}
             />
           )}
@@ -91,7 +106,10 @@ export default function App() {
               doctor={selectedDoctor}
               patient={user}
               onBack={() => setActive('doctors')}
-              onBookingComplete={() => setActive('appts')} // Başarılı olunca listeleme ekranına atar
+              onBookingComplete={() => {
+                setAiChatHistory('') // Randevu başarıyla tamamlandığında AI geçmişini sıfırlıyoruz
+                setActive('appts')
+              }} 
             />
           )}
           {active === 'appts' && (
