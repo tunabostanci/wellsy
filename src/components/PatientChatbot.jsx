@@ -186,11 +186,26 @@ export default function PatientChatbot({ onNavigateToDoctors = () => {} }) {
           <span>çevrimiçi</span>
         </div>
         <div className="wa-header-actions">
-          <button type="button" className={`btn btn-sm${mode === 'chat' ? ' active' : ''}`} onClick={() => setMode('chat')}>Chat</button>
-          <button type="button" className={`btn btn-sm${mode === 'symptom' ? ' active' : ''}`} onClick={startSymptomCheck}>Symptom checker</button>
-          {/* CRITICAL FIXED: Prop olarak gelen üst fonksiyon tetikleniyor */}
-          <button type="button" className="btn btn-sm" onClick={onNavigateToDoctors}>New Appointment</button>
-        </div>
+  <button type="button" className={`btn btn-sm${mode === 'chat' ? ' active' : ''}`} onClick={() => setMode('chat')}>Chat</button>
+  <button type="button" className={`btn btn-sm${mode === 'symptom' ? ' active' : ''}`} onClick={startSymptomCheck}>Symptom checker</button>
+  
+  {/* GÜNCELLENEN DÜĞME: Doğrudan gitmek yerine konuşma geçmişini toplayıp gönderiyor */}
+  <button 
+    type="button" 
+    className="btn btn-sm" 
+    onClick={() => {
+      // Mesaj geçmişindeki kullanıcı ve chatbot konuşmalarını alt alta ekleyip düz bir metin (string) yapıyoruz
+      const chatSummary = messages
+        .map(msg => `${msg.role === 'user' ? 'Patient' : 'AI Assistant'}: ${msg.text}`)
+        .join('\n');
+      
+      // Üst bileşene (App.jsx'e) hem yönlendirme emrini hem de bu metni parametre olarak paslıyoruz
+      onNavigateToDoctors(chatSummary);
+    }}
+  >
+    New Appointment
+  </button>
+</div>
       </div>
 
       <div className="wa-chat-window">

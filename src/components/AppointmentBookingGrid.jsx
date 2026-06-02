@@ -38,12 +38,12 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
       })
 
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Randevu onaylanamadı.')
+      if (!response.ok) throw new Error(data.error || 'Randevu talebi iletilemedi.')
 
       setSuccess(true)
       setTimeout(() => {
         onBookingComplete()
-      }, 1800)
+      }, 2500) // Kullanıcının bilgilendirme metnini rahat okuması için süre hafif uzatıldı
 
     } catch (err) {
       setError(err.message || 'Bir çakışma hatası oluştu.')
@@ -52,16 +52,21 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
     }
   }
 
+  // ONAY EKRANI: SRS/SDD İş Akışına Göre Güncellendi (Pending Vurgusu Eklendi)
   if (success) {
     return (
-      <div style={{ padding: '40px 20px', textAlign: 'center', maxWidth: 450, margin: '50px auto', background: 'white', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderTop: '6px solid #008069' }}>
-        <div style={{ width: 64, height: 64, background: '#e1f5ee', borderRadius: '50%', display: 'flex', alignItems: 'center', justifycontent: 'center', margin: '0 auto 16px auto' }}>
-          <i className="ti ti-check" style={{ fontSize: 32, color: '#008069' }} />
+      <div style={{ padding: '40px 20px', textAlign: 'center', maxWidth: 450, margin: '50px auto', background: 'white', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderTop: '6px solid #854F0B' }}>
+        <div style={{ width: 64, height: 64, background: '#fff3cd', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+          <i className="ti ti-clock" style={{ fontSize: 32, color: '#854F0B' }} />
         </div>
-        <h3 style={{ color: '#111b21', fontSize: 20, fontWeight: 600 }}>Randevunuz Alındı!</h3>
+        <h3 style={{ color: '#111b21', fontSize: 20, fontWeight: 600 }}>Randevu Talebiniz Alındı!</h3>
         <p style={{ fontSize: 14, color: '#667781', marginTop: 8, lineHeight: 1.5 }}>
-          {doctor.name} ile olan randevunuz başarıyla sisteme işlendi. Randevularım sayfasına aktarılıyorsunuz...
+          {doctor.name} ile olan randevu talebiniz **Beklemede (Pending)** olarak sisteme kaydedilmiştir. 
+          Klinik personeli onayladıktan sonra randevunuz kesinleşecektir.
         </p>
+        <div style={{ marginTop: 12, fontSize: 12, color: '#854F0B', background: '#fff3cd', padding: '6px 12px', borderRadius: 6, display: 'inline-block', fontWeight: 500 }}>
+          Durum: Onay Bekliyor (Pending)
+        </div>
       </div>
     )
   }
@@ -72,7 +77,7 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
         
         {/* Doktor Mini Kart Alanı */}
         <div className="card" style={{ padding: 20, background: 'white', borderRadius: 12, display: 'flex', gap: 16, alignItems: 'center', marginBottom: 20, border: '1px solid var(--border)' }}>
-          <div style={{ width: 52, height: 52, borderRadius: '50%', background: doctor?.avatarBg || '#E1F5EE', color: doctor?.avatarColor || '#0F6E56', display: 'flex', alignItems: 'center', justifycontent: 'center', fontWeight: 'bold', fontSize: 18 }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: doctor?.avatarBg || '#E1F5EE', color: doctor?.avatarColor || '#0F6E56', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 18 }}>
             {doctor?.initials || 'DR'}
           </div>
           <div>
@@ -99,7 +104,6 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: '#111b21', display: 'block', marginBottom: 12 }}>Müsait Saatler</label>
             
-            {/* Şık ve Kompakt Grid Yapısı */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {AVAILABLE_SLOTS.map(slot => {
                 const isSelected = selectedSlot === slot;
@@ -108,12 +112,12 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
                     key={slot} type="button"
                     style={{
                       height: '42px',
-                      borderRadius: '20px', // Oval modern görünüm
+                      borderRadius: '20px',
                       fontSize: '13px',
-                      fontWeight: isSelected ? '6px' : '4px',
+                      fontWeight: isSelected ? '600' : '400',
                       cursor: 'pointer',
                       border: isSelected ? 'none' : '1px solid #e9edef',
-                      background: isSelected ? '#008069' : '#ffffff', // Seçilince WhatsApp Yeşili
+                      background: isSelected ? '#008069' : '#ffffff',
                       color: isSelected ? '#ffffff' : '#111b21',
                       transition: 'all 0.15s ease-in-out',
                       boxShadow: isSelected ? '0 4px 10px rgba(0,128,105,0.2)' : 'none'
@@ -141,14 +145,14 @@ export default function AppointmentBookingGrid({ doctor, patient, onBack, onBook
         </div>
 
         {/* Aksiyon Butonları Çubuğu */}
-        <div style={{ display: 'flex', gap: 12, justifycontent: 'flex-end', marginTop: 20 }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 20 }}>
           <button type="button" className="btn" onClick={onBack} style={{ height: 42, padding: '0 20px', borderRadius: 21 }} disabled={loading}>Geri Dön</button>
           <button 
             type="button" className="btn-primary btn" onClick={handleConfirmBooking} 
             style={{ height: 42, padding: '0 28px', borderRadius: 21, background: '#008069', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
             disabled={loading || !selectedSlot}
           >
-            {loading ? 'Onaylanıyor...' : 'Randevuyu Onayla'} <i className="ti ti-chevron-right" />
+            {loading ? 'Talep İletiliyor...' : 'Randevu Talebi Oluştur'} <i className="ti ti-chevron-right" />
           </button>
         </div>
 

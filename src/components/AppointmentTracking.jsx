@@ -141,44 +141,67 @@ export default function AppointmentTracking({ patient, onNewAppointment = () => 
 
       <div style={{ display: 'grid', gap: 12 }}>
         {currentList.map((appt) => (
-          <div 
-            key={appt.id} 
-            className="card" 
-            style={{ 
-              padding: 16, 
-              background: 'white', 
-              borderRadius: 8, 
-              borderLeft: tab === 'upcoming' ? '4px solid #008069' : '4px solid #667781', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center' 
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>{appt.doctor}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>
-                {appt.doctor_specialty} • <span className="text-muted">{appt.clinic}</span>
-              </div>
-              {appt.note && (
-                <div style={{ fontSize: 12, color: '#667781', marginTop: 6, fontStyle: 'italic' }}>
-                  <strong>Notunuz:</strong> {appt.note}
-                </div>
-              )}
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontWeight: 600, color: '#008069', fontSize: 14 }}>
-                {/* ÇÖZÜM: formatTurkishDate fonksiyonu ile tarih burada temizleniyor */}
-                <i className="ti ti-calendar" /> {formatTurkishDate(appt.date)}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>
-                <i className="ti ti-clock" /> Saat: {appt.time}
-              </div>
-              <span className={`badge ${appt.status === 'Confirmed' ? 'badge-green' : 'badge-amber'}`} style={{ marginTop: 6, display: 'inline-block' }}>
-                {appt.status}
-              </span>
-            </div>
-          </div>
-        ))}
+  <div 
+    key={appt.id} 
+    className="card" 
+    style={{ 
+      padding: 16, 
+      background: 'white', 
+      borderRadius: 8, 
+      borderLeft: appt.status === 'Confirmed' ? '4px solid #008069' : appt.status === 'Cancellation Requested' ? '4px solid #d9383a' : '4px solid #854F0B', 
+      display: 'flex', 
+      justifyContent: 'space-between', 
+      alignItems: 'center' 
+    }}
+  >
+    <div>
+      <div style={{ fontWeight: 600, fontSize: 15 }}>{appt.doctor}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>
+        {appt.doctor_specialty} • <span className="text-muted">{appt.clinic}</span>
+      </div>
+      {appt.note && (
+        <div style={{ fontSize: 12, color: '#667781', marginTop: 6, fontStyle: 'italic' }}>
+          <strong>Notunuz:</strong> {appt.note}
+        </div>
+      )}
+      
+      {/* CANLI İPTAL ETME BUTONU: Sadece Onaylı veya Bekleyen randevularda çıkar */}
+      {tab === 'upcoming' && appt.status !== 'Cancellation Requested' && appt.status !== 'Cancelled' && (
+        <button
+          type="button"
+          style={{
+            marginTop: 10, padding: '4px 10px', background: '#fff1f1', color: '#d9383a',
+            border: '1px solid #fccfcf', borderRadius: '12px', fontSize: '11px', cursor: 'pointer', fontWeight: '500'
+          }}
+          onClick={async () => {
+            if(confirm('Bu randevu için iptal talebi oluşturmak istediğinize emin misiniz?')) {
+              try {
+                const res = await fetch(`${API_URL}/api/appointments/${appt.id}/request-cancel`, { method: 'PUT' });
+                if(res.ok) {
+                  alert('İptal talebiniz klinik personeline iletildi.');
+                  loadAppointments(); // Listeyi canlı yeniler
+                }
+              } catch(e) { alert('Talep iletilemedi.'); }
+            }
+          }}
+        >
+          <i className="ti ti-trash" /> Randevuyu İptal Et
+        </button>
+      )}
+    </div>
+    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+      <div style={{ fontWeight: 600, color: '#008069', fontSize: 14 }}>
+        <i className="ti ti-calendar" /> {formatTurkishDate(appt.date)}
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>
+        <i className="ti ti-clock" /> Saat: {appt.time}
+      </div>
+      <span className={`badge ${appt.status === 'Confirmed' ? 'badge-green' : appt.status === 'Cancellation Requested' ? 'badge-red' : 'badge-amber'}`} style={{ marginTop: 6, display: 'inline-block' }}>
+        {appt.status === 'Cancellation Requested' ? 'İptal Bekliyor' : appt.status}
+      </span>
+    </div>
+  </div>
+))}
       </div>
     </div>
   )

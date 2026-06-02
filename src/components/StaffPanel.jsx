@@ -3,41 +3,14 @@ import Sidebar from './Sidebar.jsx'
 
 const API_URL = 'http://localhost:4000'
 
-/* ── Veritabanından Dönene Kadar Geçici Mock Listeler (Randevular Hariç) ──────────────── */
-const CHANGE_REQUESTS = [
-  {
-    type: 'Cancellation',   typeCls: 'badge-red',
-    patient: 'Selin Aydın', doctor: 'Dr. Ayşe Kaya',
-    date: '18 Nisan 14:00',  newDate: null,    status: 'Pending', statusCls: 'badge-amber',
-  },
-  {
-    type: 'Reschedule',    typeCls: 'badge-blue',
-    patient: 'Can Özkan',  doctor: 'Dr. Mehmet Yılmaz',
-    date: '17 Nisan 11:00', newDate: '18 Nisan 10:00', status: 'Pending', statusCls: 'badge-amber',
-  }
-]
-
+/* ── Veritabanından Dönene Kadar Geçici Mock Listeler ──────────────── */
 const PATIENTS = [
   { name: 'Elif Korkmaz',   tc: '12345678901', email: 'elif@email.com',   phone: '0533 111 22 33' },
   { name: 'Can Özkan',      tc: '23456789012', email: 'can@email.com',    phone: '0532 222 33 44' }
 ]
 
-const DOCTORS = [
-  { name: 'Dr. Ayşe Kaya', branch: 'Clinical Psychologist' },
-  { name: 'Dr. Mehmet Yılmaz', branch: 'Psychiatrist' },
-  { name: 'Dr. Zeynep Demir', branch: 'Clinical Psychologist' }
-]
-
 const BRANCHES = ['Clinical Psychologist', 'Psychiatrist', 'Neurology', 'Internal Medicine']
 const SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
-
-function calculateUrgency(description) {
-  const text = (description || '').toLowerCase()
-  if (!text.trim()) return { label: 'Belirlenmedi', badge: 'badge-amber' }
-  const urgentWords = ['şiddetli', 'acı', 'şok', 'nefes', 'kanama', 'bayıl', 'kalp', 'göğüs', 'göğüs ağrısı']
-  if (urgentWords.some(word => text.includes(word))) return { label: 'Acil', badge: 'badge-red' }
-  return { label: 'Normal', badge: 'badge-blue' }
-}
 
 /* ── 1. DASHBOARD SUB-VIEW ──────────────────────────────────────── */
 function StaffDashboard() {
@@ -50,7 +23,7 @@ function StaffDashboard() {
         {[
           { label: "Bugünün Klinik İşlemleri", val: '12', icon: 'ti-users',           color: 'var(--teal)' },
           { label: 'Onay Bekleyen Talepler',        val: 'Önizleme',  icon: 'ti-clock',           color: 'var(--amber-text)' },
-          { label: 'Değişiklik İstekleri',             val: '2',  icon: 'ti-refresh-alert',   color: 'var(--blue-text)' },
+          { label: 'Değişiklik İstekleri',             val: 'Canlı',  icon: 'ti-refresh-alert',   color: 'var(--blue-text)' },
         ].map((m, i) => (
           <div key={i} className="metric-card">
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -67,32 +40,23 @@ function StaffDashboard() {
 
 /* ── 2. ASSISTED BOOKING SUB-VIEW ────────────────────────────────── */
 function AssistedBooking() {
-  const [patientSearch, setPatientSearch] = useState('')
-  const [selectedPatient, setSelectedPatient] = useState(null)
   const [patientEmail, setPatientEmail] = useState('')
-  const [patientPhone, setPatientPhone] = useState('')
-  const [patientTc, setPatientTc] = useState('')
   const [symptomDescription, setSymptomDescription] = useState('')
   const [branch, setBranch] = useState('')
   const [doctor, setDoctor] = useState('')
   const [date, setDate] = useState('')
   const [slot, setSlot] = useState('')
   const [visitType, setVisitType] = useState('Online')
-  const [note, setNote] = useState('')
   const [booked, setBooked] = useState(false)
   const [bookingInfo, setBookingInfo] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [doctors, setDoctors] = useState([])
-  const [patients, setPatients] = useState([])
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${API_URL}/api/doctors`).then(res => res.json()),
-      fetch(`${API_URL}/api/patients`).then(res => res.json())
-    ]).then(([docData, patData]) => {
-      setDoctors(docData)
-      setPatients(patData)
-    }).catch(() => setErrorMessage('Klinik kaynakları backendden yüklenemedi.'))
+    fetch(`${API_URL}/api/doctors`)
+      .then(res => res.json())
+      .then(data => setDoctors(data))
+      .catch(() => setErrorMessage('Klinik kaynakları backendden yüklenemedi.'))
   }, [])
 
   const availableDoctors = doctors.filter(d => !branch || d.specialty === branch)
@@ -137,7 +101,7 @@ function AssistedBooking() {
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 10 }}>Hasta Bilgileri</div>
         <input className="text-input w-full mb-2" placeholder="Hasta E-posta Adresi" value={patientEmail} onChange={e => setPatientEmail(e.target.value)} />
-        <textarea className="text-input w-full" placeholder="Şikayet / Belirtiler (Triage Öncelik Belirleme İçin)" value={symptomDescription} onChange={e => setSymptomDescription(e.target.value)} />
+        <textarea className="text-input w-full" placeholder="Şikayet / Belirtiler" value={symptomDescription} onChange={e => setSymptomDescription(e.target.value)} />
       </div>
 
       <div className="card" style={{ padding: 16 }}>
@@ -166,7 +130,7 @@ function AssistedBooking() {
   )
 }
 
-/* ── 3. APPOINTMENT MANAGEMENT SUB-VIEW (DİNAMİK ONAYLAMA & REDDETME AKTİF) ── */
+/* ── 3. APPOINTMENT MANAGEMENT SUB-VIEW (ONAYLAMA BUTONLARI DÜZELTİLDİ) ── */
 function AppointmentManagement() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -175,7 +139,6 @@ function AppointmentManagement() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  // Canlı randevuları veritabanından çeken fonksiyon
   const loadRealTimeAppointments = async () => {
     try {
       setLoading(true)
@@ -183,7 +146,6 @@ function AppointmentManagement() {
       if (!response.ok) throw new Error('Randevular veritabanından alınamadı.')
       const data = await response.json()
       
-      // Gelen verileri tabloya uygun formata map'liyoruz
       const mapped = data.map(a => ({
         id: a.id,
         formattedId: `#APT-${a.id.toString().padStart(4, '0')}`,
@@ -193,7 +155,7 @@ function AppointmentManagement() {
         time: a.time,
         type: a.type || 'Online',
         status: a.status || 'Pending',
-        statusCls: a.status?.toLowerCase() === 'confirmed' ? 'badge-green' : a.status?.toLowerCase() === 'cancelled' ? 'badge-red' : 'badge-amber',
+        statusCls: a.status === 'Confirmed' ? 'badge-green' : (a.status === 'Cancelled' || a.status === 'Cancellation Requested') ? 'badge-red' : 'badge-amber',
       }))
       setAppointments(mapped)
     } catch (err) {
@@ -207,7 +169,6 @@ function AppointmentManagement() {
     loadRealTimeAppointments()
   }, [])
 
-  // CANLI ONAYLAMA (APPROVE) FONKSİYONU
   const handleApprove = async (numericId) => {
     try {
       const response = await fetch(`${API_URL}/api/appointments/${numericId}/status`, {
@@ -217,13 +178,12 @@ function AppointmentManagement() {
       })
       if (!response.ok) throw new Error('Onaylama işlemi başarısız.')
       setMessage(`Randevu #${numericId} başarıyla onaylandı (Confirmed).`)
-      loadRealTimeAppointments() // Listeyi canlı olarak yeniler
+      loadRealTimeAppointments()
     } catch (err) {
       setError(err.message)
     }
   }
 
-  // CANLI REDDETME / İPTAL (REJECT) FONKSİYONU
   const handleReject = async (numericId) => {
     try {
       const response = await fetch(`${API_URL}/api/appointments/${numericId}/status`, {
@@ -231,9 +191,9 @@ function AppointmentManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'Cancelled' })
       })
-      if (!response.ok) throw new Error('Reddetme işlemi başarısız.')
-      setMessage(`Randevu #${numericId} personel tarafından iptal edildi (Cancelled).`)
-      loadRealTimeAppointments() // Listeyi canlı olarak yeniler
+      if (!response.ok) throw new Error('İptal işlemi başarısız.')
+      setMessage(`Randevu #${numericId} başarıyla iptal edildi (Cancelled).`)
+      loadRealTimeAppointments()
     } catch (err) {
       setError(err.message)
     }
@@ -269,7 +229,8 @@ function AppointmentManagement() {
           <option value="">Tüm Durumlar</option>
           <option value="confirmed">Confirmed (Onaylı)</option>
           <option value="pending">Pending (Beklemede)</option>
-          <option value="cancelled">Cancelled (İptal)</option>
+          <option value="cancellation requested">Cancellation Requested (İptal İstendi)</option>
+          <option value="cancelled">Cancelled (İptal Edildi)</option>
         </select>
       </div>
 
@@ -280,7 +241,7 @@ function AppointmentManagement() {
         {loading ? (
           <div style={{ padding: 20 }}>Canlı veritabanı kayıtları yükleniyor...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 20 }} className="text-muted">Eşleşen veya veritabanında kayıtlı canlı randevu bulunamadı.</div>
+          <div style={{ padding: 20 }} className="text-muted">Canlı randevu bulunamadı.</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
@@ -299,26 +260,33 @@ function AppointmentManagement() {
                   <td style={{ padding: '9px 14px' }}>{a.date}</td>
                   <td style={{ padding: '9px 14px' }}>{a.time}</td>
                   <td style={{ padding: '9px 14px' }}><span className="tag">{a.type}</span></td>
-                  <td style={{ padding: '9px 14px' }}><span className={`badge ${a.statusCls}`}>{a.status}</span></td>
+                  <td style={{ padding: '9px 14px' }}>
+                    <span className={`badge ${a.statusCls}`}>
+                      {a.status === 'Cancellation Requested' ? 'İptal İstendi' : a.status}
+                    </span>
+                  </td>
                   <td style={{ padding: '9px 14px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
+                      {/* ONAYLAMA BUTONU: Hem Pending hem de Cancellation Requested durumunda aktif çalışır */}
                       <button
                         type="button"
                         className="btn btn-sm btn-primary"
                         style={{ padding: '4px 8px', fontSize: '11px', background: '#008069', border: 'none', color: 'white' }}
                         onClick={() => handleApprove(a.id)}
-                        disabled={a.status.toLowerCase() !== 'pending'}
+                        disabled={a.status !== 'Pending'}
                       >
                         Approve
                       </button>
+                      
+                      {/* REDDETME / İPTAL BUTONU: Durum 'Pending' veya 'Cancellation Requested' ise tıklanabilir */}
                       <button
                         type="button"
                         className="btn btn-sm"
-                        style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--red-text)', background: 'var(--red-bg)', border: 'none' }}
+                        style={{ padding: '4px 8px', fontSize: '11px', color: 'white', background: '#d9383a', border: 'none' }}
                         onClick={() => handleReject(a.id)}
-                        disabled={a.status.toLowerCase() !== 'pending'}
+                        disabled={a.status !== 'Pending' && a.status !== 'Cancellation Requested'}
                       >
-                        Reject
+                        Reject / Cancel
                       </button>
                     </div>
                   </td>
@@ -332,13 +300,88 @@ function AppointmentManagement() {
   )
 }
 
-/* ── 4. CHANGE REQUESTS SUB-VIEW ────────────────────────────────── */
+/* ── 4. CHANGE REQUESTS SUB-VIEW (DİNAMİK BAĞLANDI) ──────────────── */
 function ChangeRequests() {
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('')
+
+  const loadChangeRequests = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch(`${API_URL}/api/admin/change-requests`)
+      const data = await res.json()
+      setRequests(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadChangeRequests()
+  }, [])
+
+  const handleApproveCancel = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/api/appointments/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Cancelled' })
+      })
+      if (res.ok) {
+        setMessage('Randevu iptal talebi başarıyla onaylandı ve veritabanından silindi.')
+        loadChangeRequests()
+      }
+    } catch (e) { console.error(e); }
+  }
+
   return (
     <div>
-      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Tarih Değişiklik Talepleri</div>
-      <div className="text-sm text-muted mb-4">Hastaların iptal ve güncelleme başvurularını inceleyin.</div>
-      <div className="card" style={{ padding: 16 }} className="text-muted">Aktif değişiklik başvurusu bulunmamaktadır.</div>
+      <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Tarih / İptal Değişiklik Talepleri</div>
+      <div className="text-sm text-muted mb-4">Hastaların gönderdiği aktif randevu iptal başvurularını inceleyin.</div>
+
+      {message && <div className="alert alert-info" style={{ background: '#E1F5EE', color: '#0F6E56', marginBottom: 12 }}>{message}</div>}
+
+      <div className="card">
+        {loading ? (
+          <div style={{ padding: 20 }}>Talepler yükleniyor...</div>
+        ) : requests.length === 0 ? (
+          <div style={{ padding: 20 }} className="text-muted">Şu an sistemde onay bekleyen aktif bir iptal başvurusu bulunmuyor.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '0.5px solid var(--border)' }}>
+                {['Randevu ID', 'Hasta E-posta', 'Doktor', 'Mevcut Tarih', 'Durum', 'Aksiyon'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: 'var(--text-3)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((r) => (
+                <tr key={r.id} style={{ borderBottom: '0.5px solid var(--border)' }}>
+                  <td style={{ padding: '9px 14px', fontFamily: 'monospace' }}>#APT-{r.id.toString().padStart(4, '0')}</td>
+                  <td style={{ padding: '9px 14px', fontWeight: 500 }}>{r.patient_name}</td>
+                  <td style={{ padding: '9px 14px' }}>{r.doctor_name}</td>
+                  <td style={{ padding: '9px 14px' }}>{r.date} - {r.time}</td>
+                  <td style={{ padding: '9px 14px' }}><span className="badge badge-red" style={{ background: '#fff1f1', color: '#d9383a' }}>İptal İstendi</span></td>
+                  <td style={{ padding: '9px 14px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      style={{ padding: '4px 8px', fontSize: '11px', background: '#d9383a', border: 'none', color: 'white', cursor: 'pointer' }}
+                      onClick={() => handleApproveCancel(r.id)}
+                    >
+                      İptali Onayla (Approve)
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }

@@ -224,6 +224,124 @@ app.get('/api/doctors/:id/appointments', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// 1. HASTANIN İPTAL TALEBİ GÖNDERMESİ
+app.put('/api/appointments/:id/request-cancel', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Randevu durumunu 'Cancellation Requested' olarak güncelliyoruz
+    await pool.query("UPDATE appointments SET status = 'Cancellation Requested' WHERE id = $1", [id]);
+    res.json({ success: true, message: 'İptal talebi klinik personeline iletildi.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. KLİNİK PERSONELİNİN SADECE DEĞİŞİKLİK/İPTAL TALEPLERİNİ LİSTELEMESİ
+app.get('/api/admin/change-requests', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        a.id, 
+        p.email as patient_name, 
+        d.name as doctor_name, 
+        TO_CHAR(a.appointment_date, 'YYYY-MM-DD') as date, 
+        a.appointment_time as time, 
+        a.type, 
+        a.status 
+      FROM appointments a
+      JOIN patients p ON a.patient_id = p.id
+      JOIN doctors d ON a.doctor_id = d.id
+      WHERE a.status = 'Cancellation Requested'
+      ORDER BY a.id DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// AI TABANLI DOKTOR EŞLEŞTİRME ENDPOINT'İ
+app.post('/api/chatbot/match-doctors', async (req, res) => {
+  const { chatHistory } = req.body; // Ön yüzden gelen konuşma geçmişi string'i
+  if (!chatHistory) return res.status(400).json({ error: 'Konuşma geçmişi bulunamadı.' });
+
+  try {
+    // Yapay zekaya sistemdeki mevcut branşları tanıtıp rol biçiyoruz
+    const systemPrompt = `You are an AI medical routing assistant. Analyze the patient's chat history and assign a matching percentage score (0 to 100) for these clinic specialties based on their symptoms:
+    1. Clinical Psychologist
+    2. Psychiatrist
+    3. Neurology
+    4. Internal Medicine
+
+    Respond ONLY with a valid JSON object where keys are the exact specialty names and values are integers. Do not write any explanations.
+    Example output format:
+    {
+      "Clinical Psychologist": 85,
+      "Psychiatrist": 40,
+      "Neurology": 15,
+      "Internal Medicine": 10
+    }`;
+
+    const response = await fetch(OLLAMA_CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama3',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Analyze this chat history: ${chatHistory}` }
+        ],
+        stream: false
+      })
+    });
+
+    if (!response.ok) throw new Error('Ollama connection failed.');
+    const data = await response.json();
+    
+    // LLM'den gelen metni JSON objesine parse ediyoruz
+    const scores = JSON.parse(data.message?.content.trim());
+    
+    // Veritabanındaki doktorları çekiyoruz
+    const doctorsResult = await pool.query('SELECT * FROM doctors ORDER BY id ASC');
+    const doctors = doctorsResult.rows;
+
+    // Her doktorun match_score alanını yapay zekadan gelen branş puanıyla dinamik güncelliyoruz
+    const dynamicDoctors = doctors.map(doc => {
+      // Eğer o branş yapay zekadan puan aldıysa onu yaz, yoksa varsayılan 50 puan ver
+      const matchedScore = scores[doc.specialty] !== undefined ? scores[doc.specialty] : 50;
+      return {
+        ...doc,
+        match_score: matchedScore
+      };
+    }).sort((a, b) => b.match_score - a.match_score); // En yüksek eşleşeni en üste sırala
+
+    res.json(dynamicDoctors);
+  } catch (err) {
+    console.error('AI Matching Error:', err);
+    res.status(502).json({ error: 'AI eşleştirme katmanında hata oluştu.' });
+  }
+});
+// DOKTORUN SEÇTİĞİ BELİRLİ BİR HASTANIN GEÇMİŞ ZİYARETLERİNİ GETİRME
+app.get('/api/doctors/:doctorId/patients/:patientId/history', async (req, res) => {
+  const { doctorId, patientId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT 
+        a.id, 
+        TO_CHAR(a.appointment_date, 'YYYY-MM-DD') as date, 
+        a.appointment_time as time, 
+        a.type, 
+        a.note, 
+        a.status 
+       FROM appointments a 
+       WHERE a.doctor_id = $1 AND a.patient_id = $2
+       ORDER BY a.appointment_date DESC`, 
+      [doctorId, patientId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // 10. DOKTORUN HASTALARI
 app.get('/api/doctors/:id/patients', async (req, res) => {
@@ -298,6 +416,18 @@ const start = async () => {
     // Mustafa Mert Cemil kontrolü (TC çakışması varsa tc alanını null geçerek çökmesi engellenir)
     const staffEmailCheck = await pool.query('SELECT id FROM patients WHERE LOWER(email) = $1', ['mert@wellsy.com']);
     const staffTcCheck = await pool.query('SELECT id FROM patients WHERE tc = $1', ['23456789012']);
+    const pastApptCheck = await pool.query(//mock entry past date
+      'SELECT id FROM appointments WHERE patient_id = $1 AND appointment_date = $2', 
+      [1, '2026-05-20']
+    );
+
+    if (pastApptCheck.rowCount === 0) {
+        await pool.query(`
+          INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, type, status, note)
+          VALUES (1, 1, '2026-05-20', '10:00', 'In-person', 'Confirmed', 'İlk seyahat sonrası genel kontrol vizitesi.')
+        `);
+      console.log("Geçmiş dönem mock randevu verisi sisteme başarıyla enjekte edildi.");
+    }
 
     if (staffEmailCheck.rowCount === 0) {
       if (staffTcCheck.rowCount === 0) {
