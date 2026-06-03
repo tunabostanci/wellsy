@@ -10,7 +10,7 @@ const { Pool } = pg
 const PORT = process.env.PORT || 4000
 
 // GÜVENLİK UYARISI: Jüride API anahtarının patlamaması için burayı çevre değişkenine bağlamak en iyisidir
-const resend = new Resend(process.env.RESEND_API_KEY || 're_ZcT1hGTh_Dx4EgCPxXK7c95BFpjiFDYTP');
+const resend = new Resend(process.env.RESEND_API_KEY );
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@db:5432/wellsy_db'
